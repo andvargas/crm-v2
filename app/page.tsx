@@ -74,7 +74,8 @@ function Sidebar({ open, onClose, counts }: { open: boolean; onClose: () => void
 }
 
 function NavItem({ label, icon: Icon, active, count }: { label: string; icon: typeof LayoutDashboard; active?: boolean; count?: number }) {
-  return <button className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${active ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}><Icon size={18} /><span className="flex-1 text-left">{label}</span>{count !== undefined && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">{count}</span>}</button>;
+  const href: Record<string, string> = { Dashboard: "/", Opportunities: "/opportunities", Contacts: "/contacts", Companies: "/companies", Activities: "/activities", Invoices: "/invoices", Budget: "/budget", Reports: "/reports", Settings: "/settings" };
+  return <a href={href[label] || "#"} className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${active ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}><Icon size={18} /><span className="flex-1 text-left">{label}</span>{count !== undefined && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">{count}</span>}</a>;
 }
 
 const contactName = (contact: Contact) => contact.name?.fullName || [contact.name?.firstName, contact.name?.lastName].filter(Boolean).join(" ") || "Unnamed contact";
