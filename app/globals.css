@@ -16,4 +16,13 @@ button { cursor: pointer; }
 .avatar-emerald { background: #d1fae5; color: #047857; }
 .avatar-amber { background: #fef3c7; color: #a16207; }
 .avatar-rose { background: #ffe4e6; color: #be123c; }
+.metric-icon { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 12px; }
+.metric-icon-indigo { background: #eef2ff; color: #4f46e5; }
+.metric-icon-sky { background: #e0f2fe; color: #0284c7; }
+.metric-icon-emerald { background: #d1fae5; color: #059669; }
+.metric-icon-amber { background: #fef3c7; color: #d97706; }
+.status-bar-0 { background: #818cf8; }
+.status-bar-1 { background: #38bdf8; }
+.status-bar-2 { background: #34d399; }
+.status-bar-3 { background: #fbbf24; }
 ::selection { background: #c7d2fe; color: #312e81; }

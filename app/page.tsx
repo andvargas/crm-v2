@@ -1,152 +1,133 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
-  Bell,
-  BriefcaseBusiness,
-  Building2,
-  CalendarCheck2,
-  ChevronDown,
-  CircleDollarSign,
-  ContactRound,
-  FileText,
-  Gauge,
-  LayoutDashboard,
-  Menu,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Settings,
-  Target,
-  UsersRound,
-  WalletCards,
-  X,
+  AlertCircle, Bell, BriefcaseBusiness, Building2, CalendarCheck2, ChevronDown,
+  CircleDot, ContactRound, FileText, Gauge, LayoutDashboard, Menu, MoreHorizontal,
+  Plus, RefreshCw, Search, Settings, Target, WalletCards, X,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { api } from "../lib/api";
 
-const navigation = [
-  { label: "Dashboard", icon: LayoutDashboard, active: true },
-  { label: "Opportunities", icon: Target, count: 12 },
-  { label: "Contacts", icon: ContactRound },
-  { label: "Companies", icon: Building2 },
-  { label: "Activities", icon: CalendarCheck2, count: 4 },
-];
+type Contact = {
+  _id: string;
+  name?: { fullName?: string; firstName?: string; lastName?: string };
+  email?: string;
+  company?: string;
+  updatedAt: string;
+  interactions?: unknown[];
+};
+
+type Company = {
+  _id: string;
+  name?: { companyName?: string };
+  industry?: string;
+  updatedAt: string;
+  contacts?: Contact[];
+};
+
+type Interaction = {
+  _id: string;
+  fullName?: string;
+  companyName?: string;
+  type?: string;
+  channel?: string;
+  leadStatus?: string;
+  leadStages?: string[];
+  note?: string;
+  updatedAt: string;
+};
+
+function useCrmData() {
+  const contacts = useQuery({ queryKey: ["contacts"], queryFn: () => api<Contact[]>("/contacts") });
+  const companies = useQuery({ queryKey: ["companies"], queryFn: () => api<Company[]>("/companies") });
+  const interactions = useQuery({ queryKey: ["interactions"], queryFn: () => api<Interaction[]>("/interactions") });
+  return {
+    contacts: contacts.data ?? [], companies: companies.data ?? [], interactions: interactions.data ?? [],
+    isLoading: contacts.isLoading || companies.isLoading || interactions.isLoading,
+    error: contacts.error || companies.error || interactions.error,
+    refresh: () => Promise.all([contacts.refetch(), companies.refetch(), interactions.refetch()]),
+    isFetching: contacts.isFetching || companies.isFetching || interactions.isFetching,
+  };
+}
 
 const financeNavigation = [
-  { label: "Invoices", icon: FileText },
-  { label: "Budget", icon: WalletCards },
-  { label: "Reports", icon: Gauge },
+  { label: "Invoices", icon: FileText }, { label: "Budget", icon: WalletCards }, { label: "Reports", icon: Gauge },
 ];
 
-const metrics = [
-  { label: "Pipeline value", value: "£48,250", detail: "12 open opportunities", change: "+8.2%", positive: true, icon: CircleDollarSign },
-  { label: "Activities due", value: "7", detail: "4 need attention today", change: "Today", positive: false, icon: CalendarCheck2 },
-  { label: "Outstanding", value: "£6,480", detail: "Across 5 invoices", change: "2 overdue", positive: false, icon: FileText },
-  { label: "Monthly budget", value: "72%", detail: "£7,180 of £10,000", change: "On track", positive: true, icon: WalletCards },
-];
-
-const activities = [
-  { initials: "AM", name: "Alex Morgan", company: "Northstar Studio", action: "Proposal follow-up", time: "09:30", tone: "indigo" },
-  { initials: "SC", name: "Sofia Chen", company: "Field & Form", action: "Discovery call", time: "11:00", tone: "emerald" },
-  { initials: "RB", name: "Radu Balan", company: "Constructiv", action: "Invoice #1048 due", time: "Today", tone: "amber" },
-  { initials: "LH", name: "Laura Hill", company: "Paper Kite", action: "Send project estimate", time: "Tomorrow", tone: "rose" },
-];
-
-const opportunities = [
-  { company: "Northstar Studio", contact: "Alex Morgan", stage: "Proposal", value: "£12,500", date: "30 Aug", tone: "violet" },
-  { company: "Field & Form", contact: "Sofia Chen", stage: "Qualified", value: "£8,200", date: "4 Sep", tone: "sky" },
-  { company: "Constructiv", contact: "Radu Balan", stage: "Negotiation", value: "£18,000", date: "12 Sep", tone: "amber" },
-  { company: "Paper Kite", contact: "Laura Hill", stage: "New lead", value: "£4,750", date: "18 Sep", tone: "slate" },
-];
-
-function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return (
-    <>
-      {open && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-slate-950/30 backdrop-blur-sm lg:hidden" onClick={onClose} />}
-      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[272px] flex-col border-r border-slate-200 bg-white transition-transform duration-200 lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex h-20 items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-200"><BriefcaseBusiness size={20} /></div>
-            <div><p className="text-[17px] font-bold tracking-tight text-slate-950">Studio CRM</p><p className="text-xs text-slate-500">Business workspace</p></div>
-          </div>
-          <button className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden" onClick={onClose}><X size={19} /></button>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto px-3 pb-6">
-          <p className="px-3 pb-2 pt-5 text-[11px] font-bold uppercase tracking-[.14em] text-slate-400">Workspace</p>
-          {navigation.map((item) => <NavItem key={item.label} {...item} />)}
-          <p className="px-3 pb-2 pt-7 text-[11px] font-bold uppercase tracking-[.14em] text-slate-400">Finance</p>
-          {financeNavigation.map((item) => <NavItem key={item.label} {...item} />)}
-        </nav>
-
-        <div className="border-t border-slate-100 p-3">
-          <NavItem label="Settings" icon={Settings} />
-          <button className="mt-2 flex w-full items-center gap-3 rounded-xl p-3 text-left hover:bg-slate-50">
-            <div className="grid size-9 place-items-center rounded-full bg-slate-900 text-xs font-semibold text-white">AV</div>
-            <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-900">Andras Vargas</p><p className="truncate text-xs text-slate-500">Workspace owner</p></div>
-            <MoreHorizontal size={17} className="text-slate-400" />
-          </button>
-        </div>
-      </aside>
-    </>
-  );
+function Sidebar({ open, onClose, counts }: { open: boolean; onClose: () => void; counts: { contacts: number; companies: number; activities: number } }) {
+  const navigation = [
+    { label: "Dashboard", icon: LayoutDashboard, active: true },
+    { label: "Opportunities", icon: Target },
+    { label: "Contacts", icon: ContactRound, count: counts.contacts },
+    { label: "Companies", icon: Building2, count: counts.companies },
+    { label: "Activities", icon: CalendarCheck2, count: counts.activities },
+  ];
+  return <>
+    {open && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-slate-950/30 backdrop-blur-sm lg:hidden" onClick={onClose} />}
+    <aside className={`fixed inset-y-0 left-0 z-40 flex w-[272px] flex-col border-r border-slate-200 bg-white transition-transform duration-200 lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+      <div className="flex h-20 items-center justify-between px-6"><div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-200"><BriefcaseBusiness size={20} /></div><div><p className="text-[17px] font-bold tracking-tight text-slate-950">Studio CRM</p><p className="text-xs text-slate-500">Business workspace</p></div></div><button aria-label="Close navigation" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden" onClick={onClose}><X size={19} /></button></div>
+      <nav className="flex-1 overflow-y-auto px-3 pb-6"><p className="px-3 pb-2 pt-5 text-[11px] font-bold uppercase tracking-[.14em] text-slate-400">Workspace</p>{navigation.map((item) => <NavItem key={item.label} {...item} />)}<p className="px-3 pb-2 pt-7 text-[11px] font-bold uppercase tracking-[.14em] text-slate-400">Finance</p>{financeNavigation.map((item) => <NavItem key={item.label} {...item} />)}</nav>
+      <div className="border-t border-slate-100 p-3"><NavItem label="Settings" icon={Settings} /><button className="mt-2 flex w-full items-center gap-3 rounded-xl p-3 text-left hover:bg-slate-50"><div className="grid size-9 place-items-center rounded-full bg-slate-900 text-xs font-semibold text-white">AV</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-900">Andras Vargas</p><p className="truncate text-xs text-slate-500">Workspace owner</p></div><MoreHorizontal size={17} className="text-slate-400" /></button></div>
+    </aside>
+  </>;
 }
 
 function NavItem({ label, icon: Icon, active, count }: { label: string; icon: typeof LayoutDashboard; active?: boolean; count?: number }) {
-  return <button className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${active ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}><Icon size={18} strokeWidth={active ? 2.3 : 1.9} /><span className="flex-1 text-left">{label}</span>{count ? <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${active ? "bg-indigo-100" : "bg-slate-100 text-slate-500"}`}>{count}</span> : null}</button>;
+  return <button className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${active ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}><Icon size={18} /><span className="flex-1 text-left">{label}</span>{count !== undefined && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">{count}</span>}</button>;
+}
+
+const contactName = (contact: Contact) => contact.name?.fullName || [contact.name?.firstName, contact.name?.lastName].filter(Boolean).join(" ") || "Unnamed contact";
+const formatDate = (date: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(date));
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "?";
+const normalize = (value?: string) => (value || "Unspecified").replaceAll("-", " ");
+
+function LoadingDashboard() {
+  return <div className="grid animate-pulse gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-40 rounded-2xl border border-slate-200 bg-white p-5"><div className="size-10 rounded-xl bg-slate-100" /><div className="mt-5 h-4 w-24 rounded bg-slate-100" /><div className="mt-3 h-7 w-16 rounded bg-slate-100" /></div>)}</div>;
 }
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const data = useCrmData();
+  const sortedInteractions = useMemo(() => [...data.interactions].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)), [data.interactions]);
+  const recentContacts = useMemo(() => [...data.contacts].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 5), [data.contacts]);
+  const openLeads = useMemo(() => data.interactions.filter((item) => !["closed", "closed won", "rejected"].includes((item.leadStatus || "").toLowerCase())).length, [data.interactions]);
+  const statuses = useMemo(() => {
+    const counts = new Map<string, number>();
+    data.interactions.forEach((item) => counts.set(normalize(item.leadStatus), (counts.get(normalize(item.leadStatus)) ?? 0) + 1));
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+  }, [data.interactions]);
+  const companyNames = useMemo(() => new Map(data.companies.map((company) => [company._id, company.name?.companyName || "Unknown company"])), [data.companies]);
+  const filteredInteractions = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return sortedInteractions.filter((item) => !term || [item.fullName, item.companyName, item.type, item.leadStatus, item.note].some((value) => value?.toLowerCase().includes(term))).slice(0, 6);
+  }, [search, sortedInteractions]);
 
-  return (
-    <div className="min-h-screen bg-[#f7f8fb] text-slate-900">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <main className="lg:pl-[272px]">
-        <header className="sticky top-0 z-20 flex h-20 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8">
-          <button aria-label="Open navigation" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setSidebarOpen(true)}><Menu size={21} /></button>
-          <div className="relative hidden max-w-md flex-1 sm:block"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input aria-label="Search CRM" className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100" placeholder="Search contacts, companies, invoices..." /></div>
-          <div className="ml-auto flex items-center gap-2">
-            <button className="relative rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 hover:bg-slate-50"><Bell size={19} /><span className="absolute right-2 top-2 size-2 rounded-full border-2 border-white bg-rose-500" /></button>
-            <button className="flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"><Plus size={18} /><span className="hidden sm:inline">Quick add</span><ChevronDown className="hidden sm:inline" size={15} /></button>
-          </div>
-        </header>
+  const metrics = [
+    { label: "Contacts", value: data.contacts.length, detail: `${data.contacts.filter((item) => item.email).length} with email addresses`, icon: ContactRound, tone: "indigo" },
+    { label: "Companies", value: data.companies.length, detail: `${data.companies.filter((item) => item.contacts?.length).length} with linked contacts`, icon: Building2, tone: "sky" },
+    { label: "Interactions", value: data.interactions.length, detail: `${sortedInteractions[0] ? `Last updated ${formatDate(sortedInteractions[0].updatedAt)}` : "No activity yet"}`, icon: CalendarCheck2, tone: "emerald" },
+    { label: "Open leads", value: openLeads, detail: "Based on current lead status", icon: Target, tone: "amber" },
+  ];
 
-        <div className="mx-auto max-w-[1500px] px-4 py-7 md:px-8 md:py-9">
-          <section className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-            <div><p className="mb-1 text-sm font-medium text-indigo-600">Sunday, 23 August</p><h1 className="text-3xl font-bold tracking-tight text-slate-950 md:text-[34px]">Good afternoon, Andras</h1><p className="mt-2 text-sm text-slate-500">Here’s what needs your attention across the business.</p></div>
-            <button className="flex h-10 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-sm"><CalendarCheck2 size={16} />This month<ChevronDown size={15} /></button>
-          </section>
+  return <div className="min-h-screen bg-[#f7f8fb] text-slate-900">
+    <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} counts={{ contacts: data.contacts.length, companies: data.companies.length, activities: data.interactions.length }} />
+    <main className="lg:pl-[272px]">
+      <header className="sticky top-0 z-20 flex h-20 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8"><button aria-label="Open navigation" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setSidebarOpen(true)}><Menu size={21} /></button><div className="relative hidden max-w-md flex-1 sm:block"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search interactions" className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100" placeholder="Search interactions, contacts, companies..." /></div><div className="ml-auto flex items-center gap-2"><button aria-label="Notifications" className="relative rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 hover:bg-slate-50"><Bell size={19} /></button><button className="flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"><Plus size={18} /><span className="hidden sm:inline">Quick add</span><ChevronDown className="hidden sm:inline" size={15} /></button></div></header>
+      <div className="mx-auto max-w-[1500px] px-4 py-7 md:px-8 md:py-9">
+        <section className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="mb-1 text-sm font-medium text-indigo-600">Live workspace</p><h1 className="text-3xl font-bold tracking-tight text-slate-950 md:text-[34px]">Good to see you, Andras</h1><p className="mt-2 text-sm text-slate-500">A live overview of your CRM data.</p></div><button onClick={() => data.refresh()} disabled={data.isFetching} className="flex h-10 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-sm disabled:opacity-60"><RefreshCw size={16} className={data.isFetching ? "animate-spin" : ""} />Refresh data</button></section>
 
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {metrics.map(({ label, value, detail, change, positive, icon: Icon }) => (
-              <article key={label} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,.03)]">
-                <div className="mb-5 flex items-start justify-between"><div className="grid size-10 place-items-center rounded-xl bg-slate-100 text-slate-600"><Icon size={19} /></div><span className={`flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${positive ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{positive ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}{change}</span></div>
-                <p className="text-sm font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{value}</p><p className="mt-2 text-xs text-slate-400">{detail}</p>
-              </article>
-            ))}
-          </section>
+        {data.error ? <div className="mb-5 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800"><AlertCircle className="mt-0.5 shrink-0" size={19} /><div><p className="text-sm font-semibold">The CRM API could not be reached</p><p className="mt-1 text-xs text-rose-700">Check that the local PM2 backend is running on port 8000, then refresh.</p></div></div> : null}
+        {data.isLoading ? <LoadingDashboard /> : <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(({ label, value, detail, icon: Icon, tone }) => <article key={label} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,.03)]"><div className={`metric-icon metric-icon-${tone}`}><Icon size={19} /></div><p className="mt-5 text-sm font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{value}</p><p className="mt-2 text-xs text-slate-400">{detail}</p></article>)}</section>}
 
-          <section className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_.85fr]">
-            <article className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h2 className="font-bold text-slate-950">Active opportunities</h2><p className="mt-0.5 text-xs text-slate-500">Your current sales pipeline</p></div><button className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">View pipeline</button></div>
-              <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left"><thead><tr className="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400"><th className="px-5 py-3 font-semibold">Company</th><th className="px-4 py-3 font-semibold">Stage</th><th className="px-4 py-3 font-semibold">Value</th><th className="px-4 py-3 font-semibold">Close date</th><th /></tr></thead><tbody>{opportunities.map((item) => <tr key={item.company} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70"><td className="px-5 py-4"><p className="text-sm font-semibold text-slate-900">{item.company}</p><p className="mt-0.5 text-xs text-slate-400">{item.contact}</p></td><td className="px-4 py-4"><span className={`stage stage-${item.tone}`}>{item.stage}</span></td><td className="px-4 py-4 text-sm font-semibold">{item.value}</td><td className="px-4 py-4 text-sm text-slate-500">{item.date}</td><td className="px-4"><button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><MoreHorizontal size={18} /></button></td></tr>)}</tbody></table></div>
-            </article>
+        <section className="mt-5 grid gap-5 xl:grid-cols-[1.45fr_.75fr]">
+          <article className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white"><div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h2 className="font-bold text-slate-950">Recent interactions</h2><p className="mt-0.5 text-xs text-slate-500">Latest enquiries, calls and messages</p></div><span className="text-xs font-semibold text-slate-400">{filteredInteractions.length} shown</span></div><div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left"><thead><tr className="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400"><th className="px-5 py-3 font-semibold">Contact / company</th><th className="px-4 py-3 font-semibold">Type</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Updated</th><th /></tr></thead><tbody>{filteredInteractions.map((item) => <tr key={item._id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70"><td className="px-5 py-4"><p className="text-sm font-semibold text-slate-900">{item.fullName || item.companyName || "Unnamed interaction"}</p><p className="mt-0.5 max-w-xs truncate text-xs text-slate-400">{item.companyName && item.fullName ? item.companyName : item.note || "No note"}</p></td><td className="px-4 py-4"><span className="stage stage-slate capitalize">{normalize(item.type)}</span></td><td className="px-4 py-4 text-sm capitalize text-slate-600">{normalize(item.leadStatus)}</td><td className="px-4 py-4 text-sm text-slate-500">{formatDate(item.updatedAt)}</td><td className="px-4"><button aria-label="Interaction options" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><MoreHorizontal size={18} /></button></td></tr>)}</tbody></table>{!data.isLoading && filteredInteractions.length === 0 && <p className="p-8 text-center text-sm text-slate-500">No interactions match your search.</p>}</div></article>
+          <article className="rounded-2xl border border-slate-200/80 bg-white"><div className="border-b border-slate-100 px-5 py-4"><h2 className="font-bold text-slate-950">Recent contacts</h2><p className="mt-0.5 text-xs text-slate-500">Most recently updated records</p></div><div className="p-2">{recentContacts.map((contact, index) => { const name = contactName(contact); return <div key={contact._id} className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-slate-50"><div className={`avatar avatar-${["indigo", "emerald", "amber", "rose"][index % 4]}`}>{initials(name)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-900">{name}</p><p className="truncate text-xs text-slate-400">{companyNames.get(contact.company || "") || contact.email || "No company linked"}</p></div><span className="text-[11px] font-medium text-slate-400">{formatDate(contact.updatedAt)}</span></div>; })}</div></article>
+        </section>
 
-            <article className="rounded-2xl border border-slate-200/80 bg-white">
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h2 className="font-bold text-slate-950">Next activities</h2><p className="mt-0.5 text-xs text-slate-500">Your upcoming work</p></div><button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><MoreHorizontal size={19} /></button></div>
-              <div className="p-2">{activities.map((item) => <div key={item.name} className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-slate-50"><div className={`avatar avatar-${item.tone}`}>{item.initials}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-900">{item.action}</p><p className="truncate text-xs text-slate-400">{item.name} · {item.company}</p></div><span className="text-xs font-medium text-slate-500">{item.time}</span></div>)}</div>
-              <div className="border-t border-slate-100 p-4"><button className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Plus size={16} />Add activity</button></div>
-            </article>
-          </section>
-
-          <section className="mt-5 grid gap-5 md:grid-cols-3">
-            <article className="rounded-2xl bg-slate-950 p-5 text-white md:col-span-2"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-indigo-300">Pipeline snapshot</p><h2 className="mt-2 text-xl font-bold">£48,250 in active opportunities</h2><p className="mt-1 text-sm text-slate-400">Weighted forecast: £28,930</p></div><UsersRound className="text-slate-600" size={28} /></div><div className="mt-7 flex h-2 overflow-hidden rounded-full bg-slate-800"><span className="w-[18%] bg-sky-400" /><span className="w-[27%] bg-indigo-400" /><span className="w-[35%] bg-violet-400" /><span className="w-[20%] bg-emerald-400" /></div><div className="mt-3 flex justify-between text-[11px] text-slate-400"><span>New £8.7k</span><span>Qualified £13k</span><span>Proposal £16.8k</span><span>Won £9.7k</span></div></article>
-            <article className="rounded-2xl border border-slate-200/80 bg-white p-5"><div className="flex items-center justify-between"><div><p className="text-sm font-medium text-slate-500">Contacts added</p><p className="mt-1 text-2xl font-bold">24</p></div><div className="grid size-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600"><UsersRound size={19} /></div></div><div className="mt-5 flex items-end gap-1.5">{[30,45,34,60,52,73,90,65,82,100,74,92].map((height, i) => <span key={i} className="flex-1 rounded-t bg-indigo-100 last:bg-indigo-500" style={{ height: `${height * .45}px` }} />)}</div><p className="mt-2 text-xs text-emerald-600">↑ 18% from last month</p></article>
-          </section>
-        </div>
-      </main>
-    </div>
-  );
+        <section className="mt-5 grid gap-5 md:grid-cols-3"><article className="rounded-2xl bg-slate-950 p-5 text-white md:col-span-2"><div className="flex items-start justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-indigo-300">Lead status snapshot</p><h2 className="mt-2 text-xl font-bold">{data.interactions.length} recorded interactions</h2><p className="mt-1 text-sm text-slate-400">Grouped by the most common current statuses</p></div><CircleDot className="text-slate-600" size={28} /></div><div className="mt-7 grid gap-3 sm:grid-cols-4">{statuses.map(([status, count], index) => <div key={status} className="rounded-xl bg-white/5 p-3"><div className={`mb-2 h-1.5 rounded-full status-bar-${index}`} /><p className="text-xl font-bold">{count}</p><p className="mt-1 truncate text-xs capitalize text-slate-400">{status}</p></div>)}</div></article><article className="rounded-2xl border border-dashed border-slate-300 bg-white p-5"><div className="grid size-10 place-items-center rounded-xl bg-slate-100 text-slate-500"><WalletCards size={19} /></div><p className="mt-5 text-sm font-medium text-slate-500">Financial overview</p><p className="mt-1 text-xl font-bold text-slate-950">Coming next</p><p className="mt-2 text-xs leading-5 text-slate-400">Invoice and budget figures will appear here once those modules are connected.</p></article></section>
+      </div>
+    </main>
+  </div>;
 }
