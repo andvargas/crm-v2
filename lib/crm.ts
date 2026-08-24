@@ -56,3 +56,9 @@ export const initials = (name: string) => name.split(/\s+/).filter(Boolean).slic
 
 export const companyId = (contact: Contact) => typeof contact.company === "string" ? contact.company : contact.company?._id;
 export const companyName = (contact: Contact) => typeof contact.company === "object" ? contact.company.name.companyName : undefined;
+
+export const normalizeWebsite = (website?: string) => {
+  const value = website?.trim() || "";
+  if (!value || /^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+};
