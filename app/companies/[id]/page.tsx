@@ -11,7 +11,7 @@ import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { CrmShell } from "../../../components/crm-shell";
 import { api } from "../../../lib/api";
-import { Company, Contact, Interaction, contactName, formatDate, initials } from "../../../lib/crm";
+import { Company, Contact, Interaction, companyId, contactName, formatDate, initials } from "../../../lib/crm";
 
 type CompanyDraft = {
   companyName: string; shortName: string; industry: string; segment: string;
@@ -71,7 +71,7 @@ export default function CompanyDetailPage() {
   const currentMessage = messages[Math.min(messageIndex, Math.max(messages.length - 1, 0))];
   const assignableContacts = useMemo(() => {
     const term = contactSearch.trim().toLowerCase();
-    return (contactsQuery.data ?? []).filter((contact) => contact.company !== id && (!term || [contactName(contact), contact.email, contact.jobTitle].some((value) => value?.toLowerCase().includes(term))));
+    return (contactsQuery.data ?? []).filter((contact) => companyId(contact) !== id && (!term || [contactName(contact), contact.email, contact.jobTitle].some((value) => value?.toLowerCase().includes(term))));
   }, [contactSearch, contactsQuery.data, id]);
   const assignableInteractions = useMemo(() => {
     const term = interactionSearch.trim().toLowerCase();
@@ -178,7 +178,7 @@ function Detail({ icon: Icon, label, value, href }: { icon: typeof Mail; label: 
 
 function ContactRow({ contact, index }: { contact: Contact; index: number }) {
   const name = contactName(contact);
-  return <div className="flex items-center gap-3 px-5 py-4"><div className={`avatar avatar-${["indigo", "emerald", "amber", "rose"][index % 4]}`}>{initials(name)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{name}</p><p className="mt-0.5 truncate text-xs text-slate-400">{contact.jobTitle || contact.email || "No details"}</p></div><p className="text-xs text-slate-400">{contact.interactions?.length ?? 0} activities</p></div>;
+  return <div className="flex items-center gap-3 px-5 py-4"><div className={`avatar avatar-${["indigo", "emerald", "amber", "rose"][index % 4]}`}>{initials(name)}</div><div className="min-w-0 flex-1"><Link href={`/contacts/${contact._id}`} className="truncate text-sm font-semibold text-slate-900 hover:text-indigo-600">{name}</Link><p className="mt-0.5 truncate text-xs text-slate-400">{contact.jobTitle || contact.email || "No details"}</p></div><p className="text-xs text-slate-400">{contact.interactions?.length ?? 0} activities</p></div>;
 }
 
 function Field({ label, value, onChange, type = "text", required }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean }) {

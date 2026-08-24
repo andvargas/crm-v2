@@ -4,7 +4,12 @@ export type Contact = {
   email?: string;
   phone?: { generic?: string; mobile?: string; office?: string };
   jobTitle?: string;
-  company?: string;
+  company?: string | { _id: string; name: { companyName: string }; website?: string };
+  contactType?: string;
+  connectionType?: string;
+  notes?: string;
+  archivedAt?: string | null;
+  createdAt?: string;
   updatedAt: string;
   interactions?: unknown[];
 };
@@ -48,3 +53,6 @@ export const formatDate = (date?: string) => date
   : "—";
 
 export const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "?";
+
+export const companyId = (contact: Contact) => typeof contact.company === "string" ? contact.company : contact.company?._id;
+export const companyName = (contact: Contact) => typeof contact.company === "object" ? contact.company.name.companyName : undefined;
