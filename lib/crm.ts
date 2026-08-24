@@ -38,8 +38,9 @@ export type Interaction = {
   channel?: string;
   leadStatus?: string;
   note?: string;
-  company?: string;
-  contact?: string;
+  company?: string | { _id: string; name?: { companyName?: string } };
+  contact?: string | { _id: string; name?: Contact["name"]; email?: string };
+  createdAt?: string;
   updatedAt: string;
   comms?: { _id?: string; outcome?: string; timeStamp?: string }[];
 };
