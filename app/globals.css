@@ -26,3 +26,8 @@ button { cursor: pointer; }
 .status-bar-2 { background: #34d399; }
 .status-bar-3 { background: #fbbf24; }
 ::selection { background: #c7d2fe; color: #312e81; }
+
+@media print {
+  main > header { display: none !important; }
+  main { padding-left: 0 !important; }
+}
