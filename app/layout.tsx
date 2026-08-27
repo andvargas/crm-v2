@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -19,8 +19,13 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
+    apple: "/icons/icon-192.png",
   },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "Studio CRM", statusBarStyle: "default" },
 };
+
+export const viewport: Viewport = { themeColor: "#4f46e5" };
 
 export default function RootLayout({
   children,

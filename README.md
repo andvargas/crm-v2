@@ -13,7 +13,7 @@ Modern replacement for the original local CRM. The original application remains 
 
 ## Local development
 
-Copy `.env.example` to `.env.local`, then run `npm run dev`. The frontend expects the versioned API at `http://localhost:8000/api/v1`; until backend versioning is added, dashboard content is representative fixture data.
+Set `NEXT_PUBLIC_API_URL` in `.env.local`. Production-backed local development uses `https://studio-crm-api-production.up.railway.app/api/v1`.
 
 Start the current backend with `pm2 start ecosystem.config.cjs` from this directory.
 
