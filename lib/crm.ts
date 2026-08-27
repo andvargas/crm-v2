@@ -48,6 +48,23 @@ export type Interaction = {
   comms?: { _id?: string; outcome?: string; timeStamp?: string }[];
 };
 
+export const INTERACTION_TYPES = ["enquiry", "phonecall", "meeting", "socialising", "message", "cold-prospecting", "warm-prospecting", "supplier", "job application"];
+export const INTERACTION_CHANNELS = ["email", "phone", "in-person", "instant-message", "website-form", "comment"];
+export const LEAD_STATUSES = [
+  { value: "new", label: "New" },
+  { value: "enquiry received", label: "Enquiry received" },
+  { value: "i contacted", label: "I Contacted" },
+  { value: "offer/application sent", label: "Offer/Application sent" },
+  { value: "viewed", label: "Viewed" },
+  { value: "interested", label: "Interested" },
+  { value: "meeting booked", label: "Meeting booked" },
+  { value: "met/interviewed", label: "Met/Interviewed" },
+  { value: "proposal received", label: "Proposal received" },
+  { value: "closed won", label: "Closed won" },
+  { value: "rejected", label: "Rejected" },
+  { value: "i rejected", label: "I Rejected" },
+];
+
 export type InvoiceLine = { _id?: string; description: string; quantity: number; unit?: string; rate: number; amount?: number };
 export type Invoice = {
   _id: string; number: string; company?: Company | string; contact?: Contact | string;
