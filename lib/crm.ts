@@ -60,6 +60,7 @@ export const LEAD_STATUSES = [
   { value: "meeting booked", label: "Meeting booked" },
   { value: "met/interviewed", label: "Met/Interviewed" },
   { value: "proposal received", label: "Proposal received" },
+  { value: "closed", label: "Closed" },
   { value: "closed won", label: "Closed won" },
   { value: "rejected", label: "Rejected" },
   { value: "i rejected", label: "I Rejected" },
