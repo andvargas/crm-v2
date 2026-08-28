@@ -87,6 +87,23 @@ export type BudgetTransaction = {
   taxTreatment?: string; hmrcDeductible?: boolean; dwpDeductible?: boolean; source?: "crm" | "cashflow-import";
 };
 
+export const OPPORTUNITY_STAGES = [
+  { value: "new", label: "New", probability: 10 },
+  { value: "qualified", label: "Qualified", probability: 30 },
+  { value: "proposal", label: "Proposal", probability: 55 },
+  { value: "negotiation", label: "Negotiation", probability: 75 },
+  { value: "won", label: "Won", probability: 100 },
+  { value: "lost", label: "Lost", probability: 0 },
+] as const;
+export type OpportunityStage = typeof OPPORTUNITY_STAGES[number]["value"];
+export type Opportunity = {
+  _id: string; name: string; stage: OpportunityStage; value: number; currency: string; probability: number;
+  company?: Company | string | null; contact?: Contact | string | null;
+  owner?: { _id: string; name: string; email?: string; role?: string } | string;
+  expectedCloseDate?: string | null; nextAction?: string; followUpDate?: string | null; notes?: string; lostReason?: string;
+  closedAt?: string | null; createdAt: string; updatedAt: string;
+};
+
 export const contactName = (contact: Contact) => contact.name?.fullName
   || [contact.name?.firstName, contact.name?.lastName].filter(Boolean).join(" ")
   || "Unnamed contact";
