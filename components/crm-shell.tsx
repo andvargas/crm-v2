@@ -1,11 +1,12 @@
 "use client";
 
 import {
-  Bell, BriefcaseBusiness, Building2, CalendarCheck2, ContactRound, FileText,
+  BriefcaseBusiness, Building2, CalendarCheck2, ContactRound, FileText,
   Gauge, LayoutDashboard, Menu, Search, Settings, Target, WalletCards, X,
 } from "lucide-react";
 import { useState } from "react";
 import { QuickAdd } from "./quick-add";
+import { NotificationCenter } from "./notification-center";
 import { SafeLink as Link } from "./safe-link";
 
 const workspace = [
@@ -36,6 +37,6 @@ export function CrmShell({ children, activePath, search, onSearch }: { children:
       <nav className="flex-1 overflow-y-auto px-3 pb-6"><p className="px-3 pb-2 pt-5 text-[11px] font-bold uppercase tracking-[.14em] text-slate-400">Workspace</p>{workspace.map((item) => <NavLink key={item.href} item={item} active={activePath} />)}<p className="px-3 pb-2 pt-7 text-[11px] font-bold uppercase tracking-[.14em] text-slate-400">Finance</p>{finance.map((item) => <NavLink key={item.href} item={item} active={activePath} />)}</nav>
       <div className="border-t border-slate-100 p-3"><a href="/settings" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"><Settings size={18} />Settings</a><div className="mt-2 flex items-center gap-3 rounded-xl p-3"><div className="grid size-9 place-items-center rounded-full bg-slate-900 text-xs font-semibold text-white">AV</div><div><p className="text-sm font-semibold">Andras Vargas</p><p className="text-xs text-slate-500">Workspace owner</p></div></div></div>
     </aside>
-    <main className="lg:pl-[272px]"><header className="sticky top-0 z-20 flex h-20 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8"><button aria-label="Open navigation" className="rounded-lg p-2 text-slate-600 lg:hidden" onClick={() => setOpen(true)}><Menu size={21} /></button>{onSearch ? <div className="relative hidden max-w-md flex-1 sm:block"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(event) => onSearch(event.target.value)} aria-label="Search" className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-11 text-sm outline-none focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100" placeholder="Search records..." />{search && <button type="button" aria-label="Clear search" onClick={() => onSearch("")} className="absolute right-3 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100"><X size={14} strokeWidth={2.5} /></button>}</div> : <div className="flex-1" />}<button aria-label="Notifications" className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600"><Bell size={19} /></button><QuickAdd /></header>{children}</main>
+    <main className="lg:pl-[272px]"><header className="sticky top-0 z-20 flex h-20 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8"><button aria-label="Open navigation" className="rounded-lg p-2 text-slate-600 lg:hidden" onClick={() => setOpen(true)}><Menu size={21} /></button>{onSearch ? <div className="relative hidden max-w-md flex-1 sm:block"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(event) => onSearch(event.target.value)} aria-label="Search" className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-11 text-sm outline-none focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100" placeholder="Search records..." />{search && <button type="button" aria-label="Clear search" onClick={() => onSearch("")} className="absolute right-3 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100"><X size={14} strokeWidth={2.5} /></button>}</div> : <div className="flex-1" />}<NotificationCenter /><QuickAdd /></header>{children}</main>
   </div>;
 }

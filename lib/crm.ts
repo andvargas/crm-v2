@@ -104,6 +104,12 @@ export type Opportunity = {
   closedAt?: string | null; createdAt: string; updatedAt: string;
 };
 
+export type CrmNotification = {
+  key: string; type: "follow_up" | "closing" | "invoice" | "stale_lead"; priority: "high" | "medium";
+  title: string; message: string; date: string; href: string; read: boolean;
+};
+export type NotificationResponse = { items: CrmNotification[]; unreadCount: number };
+
 export const contactName = (contact: Contact) => contact.name?.fullName
   || [contact.name?.firstName, contact.name?.lastName].filter(Boolean).join(" ")
   || "Unnamed contact";

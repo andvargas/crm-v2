@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertCircle, Bell, BriefcaseBusiness, Building2, CalendarCheck2,
+  AlertCircle, BriefcaseBusiness, Building2, CalendarCheck2,
   CircleDot, ContactRound, FileText, Gauge, LayoutDashboard, Menu, MoreHorizontal,
   RefreshCw, Search, Settings, Target, WalletCards, X,
 } from "lucide-react";
@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { companyId } from "../lib/crm";
 import { QuickAdd } from "../components/quick-add";
+import { NotificationCenter } from "../components/notification-center";
 import { InteractionEditor } from "../components/interaction-editor";
 
 type Contact = {
@@ -131,7 +132,7 @@ export default function Home() {
   return <div className="min-h-screen bg-[#f7f8fb] text-slate-900">
     <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} counts={{ contacts: data.contacts.length, companies: data.companies.length, activities: data.interactions.length }} />
     <main className="lg:pl-[272px]">
-      <header className="sticky top-0 z-20 flex h-20 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8"><button aria-label="Open navigation" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setSidebarOpen(true)}><Menu size={21} /></button><div className="relative hidden max-w-md flex-1 sm:block"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search interactions" className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-11 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100" placeholder="Search interactions, contacts, companies..." />{search && <button type="button" aria-label="Clear search" onClick={() => setSearch("")} className="absolute right-3 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100"><X size={14} strokeWidth={2.5} /></button>}</div><div className="ml-auto flex items-center gap-2"><button aria-label="Notifications" className="relative rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 hover:bg-slate-50"><Bell size={19} /></button><QuickAdd /></div></header>
+      <header className="sticky top-0 z-20 flex h-20 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8"><button aria-label="Open navigation" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setSidebarOpen(true)}><Menu size={21} /></button><div className="relative hidden max-w-md flex-1 sm:block"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search interactions" className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-11 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100" placeholder="Search interactions, contacts, companies..." />{search && <button type="button" aria-label="Clear search" onClick={() => setSearch("")} className="absolute right-3 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100"><X size={14} strokeWidth={2.5} /></button>}</div><div className="ml-auto flex items-center gap-2"><NotificationCenter /><QuickAdd /></div></header>
       <div className="mx-auto max-w-[1500px] px-4 py-7 md:px-8 md:py-9">
         <section className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="mb-1 text-sm font-medium text-indigo-600">Live workspace</p><h1 className="text-3xl font-bold tracking-tight text-slate-950 md:text-[34px]">Good to see you, Andras</h1><p className="mt-2 text-sm text-slate-500">A live overview of your CRM data.</p></div><button onClick={() => data.refresh()} disabled={data.isFetching} className="flex h-10 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-sm disabled:opacity-60"><RefreshCw size={16} className={data.isFetching ? "animate-spin" : ""} />Refresh data</button></section>
 
