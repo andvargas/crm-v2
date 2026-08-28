@@ -7,9 +7,9 @@ import {
   Search, UserPlus, UsersRound, X,
 } from "lucide-react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { CrmShell } from "../../../components/crm-shell";
+import { SafeLink as Link } from "../../../components/safe-link";
 import { api } from "../../../lib/api";
 import { Company, Contact, Interaction, companyId, contactName, formatDate, initials, normalizeWebsite } from "../../../lib/crm";
 

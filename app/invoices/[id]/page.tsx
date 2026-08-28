@@ -2,9 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, CheckCircle2, Printer, Send, XCircle } from "lucide-react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { CrmShell } from "../../../components/crm-shell";
+import { SafeLink as Link } from "../../../components/safe-link";
 import { api } from "../../../lib/api";
 import { FinanceSettings, Invoice, formatDate } from "../../../lib/crm";
 

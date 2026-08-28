@@ -5,8 +5,8 @@ import {
   Gauge, LayoutDashboard, Menu, Search, Settings, Target, WalletCards, X,
 } from "lucide-react";
 import { useState } from "react";
-import Link from "next/link";
 import { QuickAdd } from "./quick-add";
+import { SafeLink as Link } from "./safe-link";
 
 const workspace = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/" },

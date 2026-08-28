@@ -17,6 +17,28 @@ Set `NEXT_PUBLIC_API_URL` in `.env.local`. Production-backed local development u
 
 Start the current backend with `pm2 start ecosystem.config.cjs` from this directory.
 
+## Production hosting
+
+- Frontend owner: the Cloudflare account for `a.vargyas@icloud.com`
+- Cloudflare Pages project: `studio-crm`
+- Cloudflare Pages URL: `https://studio-crm-2uq.pages.dev`
+- Primary public URL: `https://crm.webtechsupport.co.uk` (Cloudflare Pages custom domain; SSL enabled)
+- Backend API: `https://studio-crm-api-production.up.railway.app/api/v1`
+- DNS remains at Namecheap. Only the `crm` CNAME record is used for the frontend; the domain nameservers must not be changed.
+
+Namecheap DNS record:
+
+- Type: `CNAME`
+- Host: `crm`
+- Target: `studio-crm-2uq.pages.dev`
+
+Railway's `CORS_ORIGINS` must include both
+`https://crm.webtechsupport.co.uk` and `https://studio-crm-2uq.pages.dev`.
+
+Deploy the current frontend with `npm run deploy:pages`. Cloudflare Pages builds
+are prepared in `dist/pages`, including the vinext server runtime as an advanced
+Pages Function.
+
 ## Phase 1 status
 
 - [x] Separate v2 workspace

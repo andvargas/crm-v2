@@ -5,10 +5,10 @@ import {
   Archive, ArrowLeft, Building2, CalendarCheck2, ChevronLeft, ChevronRight,
   Mail, MapPin, MessageSquare, Pencil, Phone, Plus, RotateCcw, Save, UserRound, X,
 } from "lucide-react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 import { CrmShell } from "../../../components/crm-shell";
+import { SafeLink as Link } from "../../../components/safe-link";
 import { api } from "../../../lib/api";
 import { Company, Contact, Interaction, BUSINESS_ROLES, BUSINESS_ROLE_VALUES, CONTACT_TYPES, INTERACTION_CHANNELS, INTERACTION_TYPES, LEAD_STATUSES, companyId, companyName, contactName, formatDate, initials } from "../../../lib/crm";
 

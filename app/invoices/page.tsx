@@ -2,10 +2,10 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, CirclePoundSterling, FilePlus2, FileText, Plus, Trash2, X } from "lucide-react";
-import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AsyncCombobox } from "../../components/async-combobox";
 import { CrmShell } from "../../components/crm-shell";
+import { SafeLink as Link } from "../../components/safe-link";
 import { api } from "../../lib/api";
 import { FinanceSettings, Invoice, InvoiceLine, formatDate } from "../../lib/crm";
 
