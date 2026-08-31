@@ -129,7 +129,7 @@ export default function Home() {
     { label: "Open leads", value: openLeads, detail: "Based on current lead status", icon: Target, tone: "amber" },
   ];
 
-  return <div className="min-h-screen bg-[#f7f8fb] text-slate-900">
+  return <div className="min-h-screen max-w-full overflow-x-hidden bg-[#f7f8fb] text-slate-900">
     <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} counts={{ contacts: data.contacts.length, companies: data.companies.length, activities: data.interactions.length }} />
     <main className="lg:pl-[272px]">
       <header className="sticky top-0 z-20 flex h-20 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8"><button aria-label="Open navigation" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setSidebarOpen(true)}><Menu size={21} /></button><div className="relative hidden max-w-md flex-1 sm:block"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search interactions" className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-11 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100" placeholder="Search interactions, contacts, companies..." />{search && <button type="button" aria-label="Clear search" onClick={() => setSearch("")} className="absolute right-3 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100"><X size={14} strokeWidth={2.5} /></button>}</div><div className="ml-auto flex items-center gap-2"><NotificationCenter /><QuickAdd /></div></header>

@@ -30,7 +30,7 @@ function NavLink({ item, active }: { item: (typeof workspace)[number]; active: s
 
 export function CrmShell({ children, activePath, search, onSearch }: { children: React.ReactNode; activePath: string; search?: string; onSearch?: (value: string) => void }) {
   const [open, setOpen] = useState(false);
-  return <div className="min-h-screen bg-[#f7f8fb] text-slate-900">
+  return <div className="min-h-screen max-w-full overflow-x-hidden bg-[#f7f8fb] text-slate-900">
     {open && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-slate-950/30 backdrop-blur-sm lg:hidden" onClick={() => setOpen(false)} />}
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[272px] flex-col border-r border-slate-200 bg-white transition-transform print:hidden lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
       <div className="flex h-20 items-center justify-between px-6"><Link href="/" className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-200"><BriefcaseBusiness size={20} /></span><span><span className="block text-[17px] font-bold tracking-tight text-slate-950">Studio CRM</span><span className="block text-xs text-slate-500">Business workspace</span></span></Link><button aria-label="Close navigation" className="rounded-lg p-2 text-slate-500 lg:hidden" onClick={() => setOpen(false)}><X size={19} /></button></div>
