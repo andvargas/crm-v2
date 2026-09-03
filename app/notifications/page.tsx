@@ -17,7 +17,7 @@ export default function NotificationsPage() {
   const refresh = () => client.invalidateQueries({ queryKey: ["notifications"] });
   const action = useMutation({ mutationFn: ({ key, action }: { key: string; action: "read" | "dismiss" }) => api(`/notifications/${encodeURIComponent(key)}`, { method: "PATCH", body: JSON.stringify({ action }) }), onSuccess: refresh });
   const readAll = useMutation({ mutationFn: () => api("/notifications/read-all", { method: "POST", body: "{}" }), onSuccess: refresh });
-  const items = (query.data?.items ?? []).filter((item) => filter === "all" || !item.read);
+  const items = (query.data?.items ?? []).filter((item) => filter === "all" || (item.due && !item.read));
 
   return <CrmShell activePath="/notifications"><div className="mx-auto max-w-[1100px] px-4 py-7 md:px-8 md:py-9">
     <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-semibold text-indigo-600">Attention centre</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Notifications</h1><p className="mt-2 text-sm text-slate-500">Follow-ups, approaching close dates, stale leads and overdue invoices.</p></div>{Boolean(query.data?.unreadCount) && <button onClick={() => readAll.mutate()} className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700"><CheckCheck size={17} />Mark all as read</button>}</div>
@@ -28,7 +28,14 @@ export default function NotificationsPage() {
 
 function NotificationRow({ item, onRead, onDismiss }: { item: CrmNotification; onRead: () => void; onDismiss: () => void }) {
   const Icon = icons[item.type];
-  return <article className={`flex items-start gap-4 border-b border-slate-100 p-4 last:border-0 sm:p-5 ${item.read ? "bg-white" : "bg-indigo-50/40"}`}><div className={`grid size-10 shrink-0 place-items-center rounded-xl ${item.priority === "high" ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"}`}><Icon size={19} /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-bold text-slate-900">{item.title}</h2>{!item.read && <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-700">New</span>}</div><p className="mt-1 text-sm text-slate-500">{item.message}</p><p className="mt-2 text-xs text-slate-400">Due {formatDate(item.date)}</p><div className="mt-3 flex gap-3"><Link href={item.href} onClick={onRead} className="text-xs font-bold text-indigo-600">Open record</Link>{!item.read && <button onClick={onRead} className="text-xs font-semibold text-slate-500">Mark read</button>}</div></div><button onClick={onDismiss} aria-label={`Dismiss ${item.title}`} title="Dismiss" className="rounded-lg p-2 text-slate-300 hover:bg-slate-100 hover:text-slate-600"><X size={17} /></button></article>;
+  return <article className={`flex items-start gap-4 border-b border-slate-100 p-4 last:border-0 sm:p-5 ${item.due && !item.read ? "bg-indigo-50/40" : "bg-white"}`}>
+    <div className={`grid size-10 shrink-0 place-items-center rounded-xl ${item.priority === "high" ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"}`}><Icon size={19} /></div>
+    <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-bold text-slate-900">{item.title}</h2>{item.due && !item.read ? <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-700">New</span> : !item.due ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Scheduled</span> : null}</div>
+      <p className="mt-1 text-sm text-slate-500">{item.message}</p><p className="mt-2 text-xs text-slate-400">{item.due ? "Due" : "Scheduled for"} {formatDate(item.date)}</p>
+      <div className="mt-3 flex gap-3"><Link href={item.href} onClick={item.due ? onRead : undefined} className="text-xs font-bold text-indigo-600">Open record</Link>{item.due && !item.read && <button onClick={onRead} className="text-xs font-semibold text-slate-500">Mark read</button>}</div>
+    </div>
+    <button onClick={onDismiss} aria-label={`Dismiss ${item.title}`} title="Dismiss" className="rounded-lg p-2 text-slate-300 hover:bg-slate-100 hover:text-slate-600"><X size={17} /></button>
+  </article>;
 }
 
 function Filter({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {

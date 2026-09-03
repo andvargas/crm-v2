@@ -108,7 +108,7 @@ export type Opportunity = {
 
 export type CrmNotification = {
   key: string; type: "follow_up" | "closing" | "invoice" | "stale_lead"; priority: "high" | "medium";
-  title: string; message: string; date: string; href: string; read: boolean;
+  title: string; message: string; date: string; href: string; read: boolean; due: boolean;
 };
 export type NotificationResponse = { items: CrmNotification[]; unreadCount: number };
 
