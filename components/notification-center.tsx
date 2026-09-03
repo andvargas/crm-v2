@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { NotificationResponse } from "../lib/crm";
 import { SafeLink as Link } from "./safe-link";
@@ -15,6 +15,12 @@ export function NotificationCenter() {
   const readAll = useMutation({ mutationFn: () => api<{ updated: number }>("/notifications/read-all", { method: "POST", body: "{}" }), onSuccess: refresh });
   const markRead = (key: string) => api(`/notifications/${encodeURIComponent(key)}`, { method: "PATCH", body: JSON.stringify({ action: "read" }) }).catch(() => undefined);
   const unread = query.data?.unreadCount ?? 0;
+
+  useEffect(() => {
+    const update = () => { client.invalidateQueries({ queryKey: ["notifications"] }); };
+    window.addEventListener("crm-notifications-changed", update);
+    return () => window.removeEventListener("crm-notifications-changed", update);
+  }, [client]);
 
   return <div className="relative">
     <button aria-label={`${unread} unread notifications`} onClick={() => setOpen((value) => !value)} className="relative rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 hover:bg-slate-50"><Bell size={19} />{unread > 0 && <span className="absolute -right-1.5 -top-1.5 grid min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-5 text-white">{unread > 99 ? "99+" : unread}</span>}</button>

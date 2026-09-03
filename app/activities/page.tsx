@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronLeft, ChevronRight, FilterX, Link2, MessageSquarePlus, Pencil, Radio, SearchCheck, UserPlus } from "lucide-react";
+import { CalendarClock, ChevronDown, ChevronLeft, ChevronRight, FilterX, Link2, MessageSquarePlus, Pencil, Radio, SearchCheck, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AsyncCombobox } from "../../components/async-combobox";
 import { CrmShell } from "../../components/crm-shell";
@@ -39,6 +39,7 @@ export default function ActivitiesPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingInteraction, setEditingInteraction] = useState<Interaction | null>(null);
   const [contactAction, setContactAction] = useState<{ interaction: Interaction; mode: "create" | "assign" } | null>(null);
+  const [followUp, setFollowUp] = useState<Interaction | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
@@ -73,11 +74,29 @@ export default function ActivitiesPage() {
       <div className="grid grid-cols-[1.4fr_.8fr_.8fr_.8fr_auto] gap-4 border-b border-slate-100 px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 max-lg:hidden"><span>Contact / company</span><span>Type</span><span>Channel</span><span>Updated</span><span className="w-6" /></div>
       {query.isLoading ? <p className="p-12 text-center text-sm text-slate-500">Loading activities…</p> : query.isError ? <p className="p-12 text-center text-sm text-rose-600">Activities could not be loaded.</p> : data?.items.length ? <div className="divide-y divide-slate-100">{data.items.map((activity) => {
         const isExpanded = expanded === activity._id;
-        return <article key={activity._id}><button type="button" onClick={() => setExpanded(isExpanded ? null : activity._id)} className="grid w-full gap-3 px-5 py-4 text-left hover:bg-slate-50 lg:grid-cols-[1.4fr_.8fr_.8fr_.8fr_auto] lg:items-center lg:gap-4"><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{contactLabel(activity) || companyLabel(activity) || "Unnamed activity"}</p><p className="mt-1 truncate text-xs text-slate-400">{companyLabel(activity) || activity.note || "No company linked"}</p></div><div><span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold capitalize text-indigo-700">{normalize(activity.type)}</span></div><div className="flex items-center gap-1.5 text-sm capitalize text-slate-600"><Radio size={14} className="text-slate-400" />{normalize(activity.channel)}</div><div><p className="text-sm text-slate-600">{formatDate(activity.updatedAt)}</p><p className="mt-1 text-xs capitalize text-slate-400">{normalize(activity.leadStatus)}</p></div><ChevronDown size={18} className={`text-slate-400 transition ${isExpanded ? "rotate-180" : ""}`} /></button>{isExpanded && <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-5"><div className="mb-4 flex flex-wrap justify-end gap-2">{!activity.contact && <button type="button" onClick={() => setContactAction({ interaction: activity, mode: "create" })} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><UserPlus size={14} />Create contact</button>}<button type="button" onClick={() => setContactAction({ interaction: activity, mode: "assign" })} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><Link2 size={14} />{activity.contact ? "Change contact" : "Assign contact"}</button><button type="button" onClick={() => setEditingInteraction(activity)} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><Pencil size={14} />Edit activity</button><button type="button" onClick={() => setEditingInteraction(activity)} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white"><MessageSquarePlus size={14} />Add message</button></div><div className="grid gap-5 lg:grid-cols-[.7fr_1.3fr]"><div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Activity note</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{activity.note || "No note recorded."}</p></div><div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Conversation · {activity.comms?.length ?? 0} messages</p><div className="mt-2 max-h-64 space-y-2 overflow-y-auto">{activity.comms?.length ? [...activity.comms].reverse().map((message, index) => <div key={message._id || index} className="rounded-xl border border-slate-200 bg-white p-3"><p className="whitespace-pre-wrap text-sm leading-5 text-slate-700">{message.outcome || "Empty message"}</p><p className="mt-2 text-[11px] text-slate-400">{formatDate(message.timeStamp)}</p></div>) : <p className="rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-400">No messages recorded.</p>}</div></div></div></div>}</article>;
+        return <article key={activity._id}>
+          <button type="button" onClick={() => setExpanded(isExpanded ? null : activity._id)} className="grid w-full gap-3 px-5 py-4 text-left hover:bg-slate-50 lg:grid-cols-[1.4fr_.8fr_.8fr_.8fr_auto] lg:items-center lg:gap-4">
+            <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{contactLabel(activity) || companyLabel(activity) || "Unnamed activity"}</p><p className="mt-1 truncate text-xs text-slate-400">{companyLabel(activity) || activity.note || "No company linked"}</p></div>
+            <div><span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold capitalize text-indigo-700">{normalize(activity.type)}</span></div>
+            <div className="flex items-center gap-1.5 text-sm capitalize text-slate-600"><Radio size={14} className="text-slate-400" />{normalize(activity.channel)}</div>
+            <div><p className="text-sm text-slate-600">{formatDate(activity.updatedAt)}</p><p className="mt-1 text-xs capitalize text-slate-400">{normalize(activity.leadStatus)}</p></div>
+            <ChevronDown size={18} className={`text-slate-400 transition ${isExpanded ? "rotate-180" : ""}`} />
+          </button>
+          {isExpanded && <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-5">
+            <div className="mb-4 flex flex-wrap justify-end gap-2">
+              {!activity.contact && <button type="button" onClick={() => setContactAction({ interaction: activity, mode: "create" })} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><UserPlus size={14} />Create contact</button>}
+              <button type="button" onClick={() => setContactAction({ interaction: activity, mode: "assign" })} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><Link2 size={14} />{activity.contact ? "Change contact" : "Assign contact"}</button>
+              <button type="button" onClick={() => setFollowUp(activity)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold ${activity.followUpAt ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-white text-slate-700"}`}><CalendarClock size={14} />{activity.followUpAt ? `Follow up ${formatDate(activity.followUpAt)}` : "Follow up"}</button>
+              <button type="button" onClick={() => setEditingInteraction(activity)} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><Pencil size={14} />Edit activity</button>
+              <button type="button" onClick={() => setEditingInteraction(activity)} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white"><MessageSquarePlus size={14} />Add message</button>
+            </div>
+            <div className="grid gap-5 lg:grid-cols-[.7fr_1.3fr]"><div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Activity note</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{activity.note || "No note recorded."}</p></div><div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Conversation · {activity.comms?.length ?? 0} messages</p><div className="mt-2 max-h-64 space-y-2 overflow-y-auto">{activity.comms?.length ? [...activity.comms].reverse().map((message, index) => <div key={message._id || index} className="rounded-xl border border-slate-200 bg-white p-3"><p className="whitespace-pre-wrap text-sm leading-5 text-slate-700">{message.outcome || "Empty message"}</p><p className="mt-2 text-[11px] text-slate-400">{formatDate(message.timeStamp)}</p></div>) : <p className="rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-400">No messages recorded.</p>}</div></div></div>
+          </div>}
+        </article>;
       })}</div> : <div className="grid place-items-center px-6 py-16 text-center"><SearchCheck size={32} className="text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-700">No matching activities</p><p className="mt-1 text-xs text-slate-400">Try clearing or changing the filters.</p></div>}
       {data && data.total > 0 && <div className="flex items-center justify-between border-t border-slate-100 px-5 py-4"><p className="text-xs text-slate-500">Page {data.page} of {data.pages}</p><div className="flex gap-2"><button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || query.isFetching} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold disabled:opacity-40"><ChevronLeft size={14} />Previous</button><button type="button" onClick={() => setPage((current) => Math.min(data.pages, current + 1))} disabled={page >= data.pages || query.isFetching} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold disabled:opacity-40">Next<ChevronRight size={14} /></button></div></div>}
     </section>
-  </div></CrmShell><InteractionEditor interaction={editingInteraction} onClose={() => setEditingInteraction(null)} /><ActivityContactModal interaction={contactAction?.interaction || null} mode={contactAction?.mode || "assign"} onClose={() => setContactAction(null)} /></>;
+  </div></CrmShell><InteractionEditor interaction={editingInteraction} onClose={() => setEditingInteraction(null)} /><ActivityContactModal interaction={contactAction?.interaction || null} mode={contactAction?.mode || "assign"} onClose={() => setContactAction(null)} />{followUp && <FollowUpModal key={followUp._id} interaction={followUp} onClose={() => setFollowUp(null)} onSaved={() => query.refetch()} />}</>;
 }
 
 function Filter({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
@@ -86,4 +105,32 @@ function Filter({ label, value, options, onChange }: { label: string; value: str
 
 function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return <label><span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span><input type="date" value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100" /></label>;
+}
+
+function FollowUpModal({ interaction, onClose, onSaved }: { interaction: Interaction; onClose: () => void; onSaved: () => void }) {
+  const [date, setDate] = useState(() => {
+    if (!interaction.followUpAt) return "";
+    const initial = new Date(interaction.followUpAt);
+    return new Date(initial.getTime() - initial.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  });
+  const [note, setNote] = useState(interaction.followUpNote || "");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const label = contactLabel(interaction) || companyLabel(interaction) || "this activity";
+  const save = async () => {
+    setSaving(true); setError("");
+    try {
+      await api(`/interactions/${interaction._id}/follow-up`, { method: "PATCH", body: JSON.stringify({ followUpAt: new Date(date).toISOString(), followUpNote: note.trim() }) });
+      await onSaved(); onClose(); window.dispatchEvent(new Event("crm-notifications-changed"));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Follow-up could not be saved"); }
+    finally { setSaving(false); }
+  };
+  const clear = async () => {
+    setSaving(true); setError("");
+    try {
+      await api(`/interactions/${interaction._id}/follow-up`, { method: "PATCH", body: JSON.stringify({ followUpAt: null, followUpNote: "" }) });
+      await onSaved(); onClose(); window.dispatchEvent(new Event("crm-notifications-changed"));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Follow-up could not be removed"); setSaving(false); }
+  };
+  return <div className="fixed inset-0 z-[170] grid place-items-center overflow-y-auto bg-slate-950/45 p-4"><div role="dialog" aria-modal="true" aria-labelledby="follow-up-title" className="w-full max-w-md rounded-2xl bg-white shadow-2xl"><div className="flex items-start justify-between border-b border-slate-100 px-6 py-5"><div><h2 id="follow-up-title" className="text-lg font-bold text-slate-950">Follow up</h2><p className="mt-1 text-xs text-slate-500">Set a reminder for {label}.</p></div><button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X size={18} /></button></div><div className="space-y-4 p-6"><label><span className="mb-1.5 block text-xs font-semibold text-slate-600">Reminder date and time</span><input type="datetime-local" required value={date} onChange={(event) => setDate(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100" /></label><label><span className="mb-1.5 block text-xs font-semibold text-slate-600">Reminder note <span className="font-normal text-slate-400">(optional)</span></span><textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} placeholder="What needs to happen next?" className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100" /></label>{error && <p className="text-sm text-rose-600">{error}</p>}<div className="flex items-center justify-between pt-2">{interaction.followUpAt ? <button type="button" disabled={saving} onClick={clear} className="text-sm font-semibold text-rose-600 disabled:opacity-50">Remove reminder</button> : <span />}<div className="flex gap-2"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">Cancel</button><button type="button" disabled={saving || !date} onClick={save} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : "Save follow-up"}</button></div></div></div></div></div>;
 }

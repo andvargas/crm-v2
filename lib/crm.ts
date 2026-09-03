@@ -41,6 +41,8 @@ export type Interaction = {
   channel?: string;
   leadStatus?: string;
   note?: string;
+  followUpAt?: string | null;
+  followUpNote?: string;
   company?: string | { _id: string; name?: { companyName?: string } };
   contact?: string | { _id: string; name?: Contact["name"]; email?: string };
   createdAt?: string;
