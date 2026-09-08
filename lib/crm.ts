@@ -2,7 +2,7 @@ export type Contact = {
   _id: string;
   name?: { fullName?: string; firstName?: string; lastName?: string };
   email?: string;
-  phone?: { generic?: string; mobile?: string; office?: string };
+  phone?: { generic?: string; mobile?: string; direct?: string; office?: string; home?: string };
   jobTitle?: string;
   company?: string | null | { _id: string; name?: { companyName?: string }; website?: string };
   contactType?: string;
@@ -44,7 +44,7 @@ export type Interaction = {
   followUpAt?: string | null;
   followUpNote?: string;
   company?: string | { _id: string; name?: { companyName?: string } };
-  contact?: string | { _id: string; name?: Contact["name"]; email?: string };
+  contact?: string | { _id: string; name?: Contact["name"]; email?: string; phone?: Contact["phone"]; jobTitle?: string; company?: string | null };
   createdAt?: string;
   updatedAt: string;
   comms?: { _id?: string; outcome?: string; timeStamp?: string }[];
