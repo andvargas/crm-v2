@@ -1,4 +1,4 @@
-const CACHE = "studio-crm-shell-v1";
+const CACHE = "studio-crm-shell-v2";
 const SHELL = ["/offline.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -21,7 +21,10 @@ self.addEventListener("fetch", (event) => {
 
   if (["script", "style", "font", "image"].includes(request.destination)) {
     event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-      if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
+      if (response.ok) {
+        const cacheCopy = response.clone();
+        event.waitUntil(caches.open(CACHE).then((cache) => cache.put(request, cacheCopy)));
+      }
       return response;
     })));
   }
