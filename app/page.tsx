@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, UseQueryResult } from "@tanstack/react-query";
 import {
   AlertCircle, BriefcaseBusiness, Building2, CalendarCheck2,
   CircleDot, ContactRound, FileText, Gauge, LayoutDashboard, Menu, MoreHorizontal,
@@ -12,6 +12,7 @@ import { companyId } from "../lib/crm";
 import { QuickAdd } from "../components/quick-add";
 import { NotificationCenter } from "../components/notification-center";
 import { InteractionEditor } from "../components/interaction-editor";
+import { SafeLink as Link } from "../components/safe-link";
 
 type Contact = {
   _id: string;
@@ -43,6 +44,15 @@ type Interaction = {
   comms?: { _id?: string; outcome?: string; timeStamp?: string }[];
   createdAt?: string;
   updatedAt: string;
+};
+
+type FinancialOverview = {
+  month: string;
+  outstanding: { amount: number; count: number };
+  overdue: { amount: number; count: number };
+  freelanceNet: number;
+  personalNet: number;
+  combinedNet: number;
 };
 
 function useCrmData() {
@@ -89,6 +99,9 @@ const contactName = (contact: Contact) => contact.name?.fullName || [contact.nam
 const formatDate = (date: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(date));
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "?";
 const normalize = (value?: string) => (value || "Unspecified").replaceAll("-", " ");
+const money = (value: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value || 0);
+const signedMoney = (value: number) => `${value >= 0 ? "+" : "−"}${money(Math.abs(value))}`;
+const financeMonth = (value?: string) => value ? new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${value}-01T12:00:00.000Z`)) : "This month";
 
 function LoadingDashboard() {
   return <div className="grid animate-pulse gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-40 rounded-2xl border border-slate-200 bg-white p-5"><div className="size-10 rounded-xl bg-slate-100" /><div className="mt-5 h-4 w-24 rounded bg-slate-100" /><div className="mt-3 h-7 w-16 rounded bg-slate-100" /></div>)}</div>;
@@ -99,6 +112,7 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [editingInteraction, setEditingInteraction] = useState<Interaction | null>(null);
   const data = useCrmData();
+  const financial = useQuery({ queryKey: ["dashboard-financial-overview"], queryFn: () => api<FinancialOverview>("/reports/financial-overview") });
   const sortedInteractions = useMemo(() => [...data.interactions].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)), [data.interactions]);
   const companyNames = useMemo(() => new Map(data.companies.map((company) => [company._id, company.name?.companyName || "Unknown company"])), [data.companies]);
   const recentContacts = useMemo(() => {
@@ -134,7 +148,7 @@ export default function Home() {
     <main className="lg:pl-[272px]">
       <header className="sticky top-0 z-20 flex h-20 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8"><button aria-label="Open navigation" className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setSidebarOpen(true)}><Menu size={21} /></button><div className="relative hidden max-w-md flex-1 sm:block"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search interactions" className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-11 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100" placeholder="Search interactions, contacts, companies..." />{search && <button type="button" aria-label="Clear search" onClick={() => setSearch("")} className="absolute right-3 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100"><X size={14} strokeWidth={2.5} /></button>}</div><div className="ml-auto flex items-center gap-2"><NotificationCenter /><QuickAdd /></div></header>
       <div className="mx-auto max-w-[1500px] px-4 py-7 md:px-8 md:py-9">
-        <section className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="mb-1 text-sm font-medium text-indigo-600">Live workspace</p><h1 className="text-3xl font-bold tracking-tight text-slate-950 md:text-[34px]">Good to see you, Andras</h1><p className="mt-2 text-sm text-slate-500">A live overview of your CRM data.</p></div><button onClick={() => data.refresh()} disabled={data.isFetching} className="flex h-10 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-sm disabled:opacity-60"><RefreshCw size={16} className={data.isFetching ? "animate-spin" : ""} />Refresh data</button></section>
+        <section className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="mb-1 text-sm font-medium text-indigo-600">Live workspace</p><h1 className="text-3xl font-bold tracking-tight text-slate-950 md:text-[34px]">Good to see you, Andras</h1><p className="mt-2 text-sm text-slate-500">A live overview of your CRM data.</p></div><button onClick={() => { data.refresh(); financial.refetch(); }} disabled={data.isFetching || financial.isFetching} className="flex h-10 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-sm disabled:opacity-60"><RefreshCw size={16} className={data.isFetching || financial.isFetching ? "animate-spin" : ""} />Refresh data</button></section>
 
         {data.error ? <div className="mb-5 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800"><AlertCircle className="mt-0.5 shrink-0" size={19} /><div><p className="text-sm font-semibold">The CRM API could not be reached</p><p className="mt-1 text-xs text-rose-700">Check that the local PM2 backend is running on port 8000, then refresh.</p></div></div> : null}
         {search.trim() ? null : data.isLoading ? <LoadingDashboard /> : <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(({ label, value, detail, icon: Icon, tone }) => <article key={label} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,.03)]"><div className={`metric-icon metric-icon-${tone}`}><Icon size={19} /></div><p className="mt-5 text-sm font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{value}</p><p className="mt-2 text-xs text-slate-400">{detail}</p></article>)}</section>}
@@ -144,9 +158,18 @@ export default function Home() {
           <article className="rounded-2xl border border-slate-200/80 bg-white"><div className="border-b border-slate-100 px-5 py-4"><h2 className="font-bold text-slate-950">Recent contacts</h2><p className="mt-0.5 text-xs text-slate-500">{search.trim() ? "Matching contacts by latest interaction" : "Sorted by latest interaction"}</p></div><div className="p-2">{recentContacts.map((contact, index) => { const name = contactName(contact); const latest = [...(contact.interactions ?? [])].sort((a, b) => Date.parse(b.updatedAt || "") - Date.parse(a.updatedAt || ""))[0]?.updatedAt; return <a href={`/contacts/${contact._id}`} key={contact._id} className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-slate-50"><div className={`avatar avatar-${["indigo", "emerald", "amber", "rose"][index % 4]}`}>{initials(name)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-900">{name}</p><p className="truncate text-xs text-slate-400">{companyNames.get(companyId(contact) || "") || contact.email || "No company linked"}</p></div><span className="text-[11px] font-medium text-slate-400">{latest ? formatDate(latest) : "No activity"}</span></a>; })}{recentContacts.length === 0 && <p className="px-5 py-8 text-center text-sm text-slate-500">No contacts match your search.</p>}</div></article>
         </section>
 
-        <section className="mt-5 grid gap-5 md:grid-cols-3"><article className="rounded-2xl bg-slate-950 p-5 text-white md:col-span-2"><div className="flex items-start justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-indigo-300">Lead status snapshot</p><h2 className="mt-2 text-xl font-bold">{data.interactions.length} recorded interactions</h2><p className="mt-1 text-sm text-slate-400">Grouped by the most common current statuses</p></div><CircleDot className="text-slate-600" size={28} /></div><div className="mt-7 grid gap-3 sm:grid-cols-4">{statuses.map(([status, count], index) => <div key={status} className="rounded-xl bg-white/5 p-3"><div className={`mb-2 h-1.5 rounded-full status-bar-${index}`} /><p className="text-xl font-bold">{count}</p><p className="mt-1 truncate text-xs capitalize text-slate-400">{status}</p></div>)}</div></article><article className="rounded-2xl border border-dashed border-slate-300 bg-white p-5"><div className="grid size-10 place-items-center rounded-xl bg-slate-100 text-slate-500"><WalletCards size={19} /></div><p className="mt-5 text-sm font-medium text-slate-500">Financial overview</p><p className="mt-1 text-xl font-bold text-slate-950">Coming next</p><p className="mt-2 text-xs leading-5 text-slate-400">Invoice and budget figures will appear here once those modules are connected.</p></article></section>
+        <section className="mt-5 grid gap-5 md:grid-cols-3"><article className="rounded-2xl bg-slate-950 p-5 text-white md:col-span-2"><div className="flex items-start justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-indigo-300">Lead status snapshot</p><h2 className="mt-2 text-xl font-bold">{data.interactions.length} recorded interactions</h2><p className="mt-1 text-sm text-slate-400">Grouped by the most common current statuses</p></div><CircleDot className="text-slate-600" size={28} /></div><div className="mt-7 grid gap-3 sm:grid-cols-4">{statuses.map(([status, count], index) => <div key={status} className="rounded-xl bg-white/5 p-3"><div className={`mb-2 h-1.5 rounded-full status-bar-${index}`} /><p className="text-xl font-bold">{count}</p><p className="mt-1 truncate text-xs capitalize text-slate-400">{status}</p></div>)}</div></article><FinancialOverviewCard query={financial} /></section>
       </div>
     </main>
     <InteractionEditor interaction={editingInteraction} onClose={() => setEditingInteraction(null)} />
   </div>;
+}
+
+function FinancialOverviewCard({ query }: { query: UseQueryResult<FinancialOverview, Error> }) {
+  const value = query.data;
+  return <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white"><div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4"><div className="grid size-9 place-items-center rounded-xl bg-indigo-50 text-indigo-600"><WalletCards size={18} /></div><div><h2 className="font-bold text-slate-950">Financial overview</h2><p className="text-xs text-slate-500">{financeMonth(value?.month)}</p></div></div>{query.isLoading ? <p className="p-8 text-center text-sm text-slate-500">Loading finances…</p> : query.isError ? <p className="p-8 text-center text-sm text-rose-600">Financial overview could not be loaded.</p> : <><div className="grid grid-cols-2 gap-px bg-slate-100"><FinanceMetric label="Outstanding" value={money(value?.outstanding.amount ?? 0)} detail={`${value?.outstanding.count ?? 0} invoice${value?.outstanding.count === 1 ? "" : "s"}`} /><FinanceMetric label="Overdue" value={money(value?.overdue.amount ?? 0)} detail={`${value?.overdue.count ?? 0} invoice${value?.overdue.count === 1 ? "" : "s"}`} alert={(value?.overdue.count ?? 0) > 0} /><FinanceMetric label="Freelance P/L" value={signedMoney(value?.freelanceNet ?? 0)} positive={(value?.freelanceNet ?? 0) >= 0} /><FinanceMetric label="Personal cashflow" value={signedMoney(value?.personalNet ?? 0)} positive={(value?.personalNet ?? 0) >= 0} /></div><div className="px-5 py-4"><div className="flex items-center justify-between"><span className="text-xs font-semibold text-slate-500">Combined cashflow</span><span className={`text-base font-bold ${(value?.combinedNet ?? 0) >= 0 ? "text-indigo-700" : "text-rose-600"}`}>{signedMoney(value?.combinedNet ?? 0)}</span></div><div className="mt-4 flex gap-2"><Link href="/budget/cashflow" className="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-center text-xs font-semibold text-white">View cashflow</Link><Link href="/invoices" className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-center text-xs font-semibold text-slate-700">View invoices</Link></div></div></>}</article>;
+}
+
+function FinanceMetric({ label, value, detail, alert, positive }: { label: string; value: string; detail?: string; alert?: boolean; positive?: boolean }) {
+  return <div className="min-w-0 bg-white px-4 py-3"><p className="truncate text-[11px] font-semibold text-slate-500">{label}</p><p className={`mt-1 truncate text-sm font-bold ${alert ? "text-rose-600" : positive === false ? "text-rose-600" : positive ? "text-emerald-700" : "text-slate-950"}`}>{value}</p>{detail && <p className="mt-0.5 text-[10px] text-slate-400">{detail}</p>}</div>;
 }

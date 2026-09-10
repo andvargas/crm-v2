@@ -3,6 +3,7 @@ export type Contact = {
   name?: { fullName?: string; firstName?: string; lastName?: string };
   email?: string;
   phone?: { generic?: string; mobile?: string; direct?: string; office?: string; home?: string };
+  address?: { formatted?: string; houseName?: string; street?: string; postCode?: string; city?: string; county?: string };
   jobTitle?: string;
   company?: string | null | { _id: string; name?: { companyName?: string }; website?: string };
   contactType?: string;
@@ -39,6 +40,9 @@ export type Interaction = {
   companyName?: string;
   type?: string;
   channel?: string;
+  phone?: string;
+  email?: string;
+  physicalAddress?: string;
   leadStatus?: string;
   note?: string;
   followUpAt?: string | null;
