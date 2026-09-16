@@ -32,3 +32,19 @@ button { cursor: pointer; }
   main > header { display: none !important; }
   main { padding-left: 0 !important; }
 }
+
+@media print {
+  @page { size: A4; margin: 16mm; }
+  html:has(.quote-document), body:has(.quote-document), body:has(.quote-document) main, body:has(.quote-document) .min-h-screen { background: white !important; overflow: visible !important; }
+  body:has(.quote-document) .min-h-screen { min-height: 0 !important; }
+  body:has(.quote-document) main { padding-left: 0 !important; }
+  body:has(.quote-document) main > header { display: none !important; }
+  .quote-page { padding: 0 !important; max-width: none !important; }
+  .quote-document { border: 0 !important; padding: 0 !important; box-shadow: none !important; border-radius: 0 !important; }
+  .quote-items { overflow: visible !important; }
+  .quote-items table { min-width: 0 !important; }
+  .quote-document thead { display: table-header-group; }
+  .quote-document tr, .quote-totals { break-inside: avoid; }
+  .quote-document h1, .quote-document h2 { break-after: avoid; }
+  .quote-document { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
