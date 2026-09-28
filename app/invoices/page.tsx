@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, CirclePoundSterling, FilePlus2, FileText, Plus, Trash2, X } from "lucide-react";
+import { ArrowUpRight, CirclePoundSterling, FilePlus2, FileText, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { AsyncCombobox } from "../../components/async-combobox";
@@ -10,14 +10,43 @@ import { SafeLink as Link } from "../../components/safe-link";
 import { api } from "../../lib/api";
 import { FinanceSettings, Invoice, InvoiceLine, formatDate } from "../../lib/crm";
 
-type InvoiceResponse = { items: Invoice[]; total: number; page: number; pages: number; totals: { invoiced: number; paid: number; outstanding: number } };
+type InvoiceResponse = {
+  items: Invoice[];
+  total: number;
+  page: number;
+  pages: number;
+  totals: { invoiced: number; paid: number; outstanding: number };
+};
 const today = () => new Date().toISOString().slice(0, 10);
-const futureDate = (days: number) => { const date = new Date(); date.setDate(date.getDate() + days); return date.toISOString().slice(0, 10); };
+const futureDate = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+};
 const iso = (date: string) => new Date(`${date}T12:00:00.000Z`).toISOString();
 const money = (value: number, currency = "GBP") => new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(value || 0);
 
-type InvoiceSeed = { opportunity: string; sourceQuote?: string; company?: string; companyLabel?: string; contact?: string; customerName: string; customerContact: string; billingAddress: string; project: string; currency: string; credit: number; vatRate?: number; lineItems: InvoiceLine[] };
-type OpportunityInvoiceData = { opportunity: { id: string; name: string }; defaultSource: string; sources: { id: string; label: string; estimated: boolean; draft: InvoiceSeed }[]; invoices: { _id: string; number: string; status: string }[] };
+type InvoiceSeed = {
+  opportunity: string;
+  sourceQuote?: string;
+  company?: string;
+  companyLabel?: string;
+  contact?: string;
+  customerName: string;
+  customerContact: string;
+  billingAddress: string;
+  project: string;
+  currency: string;
+  credit: number;
+  vatRate?: number;
+  lineItems: InvoiceLine[];
+};
+type OpportunityInvoiceData = {
+  opportunity: { id: string; name: string };
+  defaultSource: string;
+  sources: { id: string; label: string; estimated: boolean; draft: InvoiceSeed }[];
+  invoices: { _id: string; number: string; status: string }[];
+};
 
 export default function InvoicesPage() {
   const opportunityId = useSearchParams().get("opportunity") || "";
@@ -26,50 +55,632 @@ export default function InvoicesPage() {
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(Boolean(opportunityId));
-  const opportunityQuery = useQuery({ queryKey: ["opportunity-invoice", opportunityId], queryFn: () => api<OpportunityInvoiceData>(`/invoices/opportunity/${encodeURIComponent(opportunityId)}`), enabled: creating && Boolean(opportunityId) });
-  useEffect(() => { const timer = window.setTimeout(() => setDebounced(search.trim()), 250); return () => window.clearTimeout(timer); }, [search]);
-  const params = useMemo(() => { const value = new URLSearchParams({ page: String(page), limit: "25" }); if (debounced) value.set("search", debounced); if (status) value.set("status", status); return value.toString(); }, [debounced, page, status]);
-  const query = useQuery({ queryKey: ["invoices", params], queryFn: () => api<InvoiceResponse>(`/invoices?${params}`), placeholderData: keepPreviousData });
-  const settingsQuery = useQuery({ queryKey: ["finance-settings"], queryFn: () => api<{ configured: boolean; settings: FinanceSettings | null }>("/finance-settings") });
+  const [editing, setEditing] = useState<Invoice | null>(null);
+  const opportunityQuery = useQuery({
+    queryKey: ["opportunity-invoice", opportunityId],
+    queryFn: () => api<OpportunityInvoiceData>(`/invoices/opportunity/${encodeURIComponent(opportunityId)}`),
+    enabled: creating && Boolean(opportunityId),
+  });
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(search.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+  const params = useMemo(() => {
+    const value = new URLSearchParams({ page: String(page), limit: "25" });
+    if (debounced) value.set("search", debounced);
+    if (status) value.set("status", status);
+    return value.toString();
+  }, [debounced, page, status]);
+  const query = useQuery({
+    queryKey: ["invoices", params],
+    queryFn: () => api<InvoiceResponse>(`/invoices?${params}`),
+    placeholderData: keepPreviousData,
+  });
+  const settingsQuery = useQuery({
+    queryKey: ["finance-settings"],
+    queryFn: () => api<{ configured: boolean; settings: FinanceSettings | null }>("/finance-settings"),
+  });
   const totals = query.data?.totals;
-  return <CrmShell activePath="/invoices" search={search} onSearch={(value) => { setSearch(value); setPage(1); }}><div className="mx-auto max-w-[1500px] px-4 py-7 md:px-8 md:py-9">
-    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-sm font-semibold text-indigo-600">Finance</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Invoices</h1><p className="mt-2 text-sm text-slate-500">Create, issue and track client invoices and payments.</p></div><button onClick={() => setCreating(true)} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white"><FilePlus2 size={17} />New invoice</button></div>
-    {!search.trim() && <section className="mt-7 grid gap-4 sm:grid-cols-3"><Stat label="Total invoiced" value={money(totals?.invoiced ?? 0)} /><Stat label="Payments received" value={money(totals?.paid ?? 0)} /><Stat label="Outstanding" value={money(totals?.outstanding ?? 0)} alert={(totals?.outstanding ?? 0) > 0} /></section>}
-    <section className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4"><div className="flex flex-wrap gap-2">{["", "draft", "sent", "paid", "overdue", "void"].map((value) => <button key={value || "all"} onClick={() => { setStatus(value); setPage(1); }} className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize ${status === value ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"}`}>{value || "All"}</button>)}</div><p className="text-xs text-slate-400">{query.data?.total ?? 0} invoices</p></div>
-      {query.isLoading ? <p className="p-12 text-center text-sm text-slate-500">Loading invoices…</p> : query.isError ? <p className="p-12 text-center text-sm text-rose-600">Invoices could not be loaded.</p> : query.data?.items.length ? <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left"><thead><tr className="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400"><th className="px-5 py-3">Invoice</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Issued</th><th className="px-4 py-3">Due</th><th className="px-4 py-3">Total</th><th className="px-4 py-3">Status</th><th /></tr></thead><tbody>{query.data.items.map((invoice) => <tr key={invoice._id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50"><td className="px-5 py-4"><Link href={`/invoices/${invoice._id}`} className="font-bold text-slate-900 hover:text-indigo-600">#{invoice.number}</Link><p className="mt-1 text-xs text-slate-400">{invoice.project || invoice.note || "Invoice"}</p></td><td className="px-4 py-4 text-sm font-semibold text-slate-700">{invoice.customerName}</td><td className="px-4 py-4 text-sm text-slate-500">{formatDate(invoice.issueDate)}</td><td className="px-4 py-4 text-sm text-slate-500">{formatDate(invoice.dueDate)}</td><td className="px-4 py-4 text-sm font-bold text-slate-900">{money(invoice.total, invoice.currency)}</td><td className="px-4 py-4"><Status value={invoice.status} /></td><td className="px-4"><Link href={`/invoices/${invoice._id}`} aria-label={`Open invoice ${invoice.number}`} className="inline-flex rounded-lg p-2 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"><ArrowUpRight size={18} /></Link></td></tr>)}</tbody></table></div> : <div className="grid place-items-center px-6 py-16 text-center"><FileText size={32} className="text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-700">No matching invoices</p><p className="mt-1 text-xs text-slate-400">Create an invoice or change the current filters.</p></div>}
-      {query.data && query.data.total > 0 && <div className="flex items-center justify-between border-t border-slate-100 px-5 py-4"><p className="text-xs text-slate-500">Page {query.data.page} of {query.data.pages}</p><div className="flex gap-2"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold disabled:opacity-40">Previous</button><button disabled={page >= query.data.pages} onClick={() => setPage((value) => value + 1)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold disabled:opacity-40">Next</button></div></div>}
-    </section>
-    {creating && (settingsQuery.isLoading || (opportunityId && opportunityQuery.isLoading) ? <InvoiceLoadState onClose={() => setCreating(false)} /> : settingsQuery.isError || (opportunityId && !opportunityQuery.data) ? <InvoiceLoadState error={opportunityQuery.error?.message || settingsQuery.error?.message || "Invoice details could not be loaded"} onClose={() => setCreating(false)} onRetry={() => { settingsQuery.refetch(); if (opportunityId) opportunityQuery.refetch(); }} /> : opportunityId && opportunityQuery.data ? <OpportunityInvoiceForm data={opportunityQuery.data} settings={settingsQuery.data?.settings} onClose={() => setCreating(false)} /> : <InvoiceForm settings={settingsQuery.data?.settings} onClose={() => setCreating(false)} />)}
-  </div></CrmShell>;
+  return (
+    <CrmShell
+      activePath="/invoices"
+      search={search}
+      onSearch={(value) => {
+        setSearch(value);
+        setPage(1);
+      }}
+    >
+      <div className="mx-auto max-w-[1500px] px-4 py-7 md:px-8 md:py-9">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <p className="text-sm font-semibold text-indigo-600">Finance</p>
+            <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Invoices</h1>
+            <p className="mt-2 text-sm text-slate-500">Create, issue and track client invoices and payments.</p>
+          </div>
+          <button
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white"
+          >
+            <FilePlus2 size={17} />
+            New invoice
+          </button>
+        </div>
+        {!search.trim() && (
+          <section className="mt-7 grid gap-4 sm:grid-cols-3">
+            <Stat label="Total invoiced" value={money(totals?.invoiced ?? 0)} />
+            <Stat label="Payments received" value={money(totals?.paid ?? 0)} />
+            <Stat label="Outstanding" value={money(totals?.outstanding ?? 0)} alert={(totals?.outstanding ?? 0) > 0} />
+          </section>
+        )}
+        <section className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+            <div className="flex flex-wrap gap-2">
+              {["", "draft", "sent", "paid", "overdue", "void"].map((value) => (
+                <button
+                  key={value || "all"}
+                  onClick={() => {
+                    setStatus(value);
+                    setPage(1);
+                  }}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize ${status === value ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"}`}
+                >
+                  {value || "All"}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400">{query.data?.total ?? 0} invoices</p>
+          </div>
+          {query.isLoading ? (
+            <p className="p-12 text-center text-sm text-slate-500">Loading invoices…</p>
+          ) : query.isError ? (
+            <p className="p-12 text-center text-sm text-rose-600">Invoices could not be loaded.</p>
+          ) : query.data?.items.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[850px] text-left">
+                <thead>
+                  <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
+                    <th className="px-5 py-3">Invoice</th>
+                    <th className="px-4 py-3">Customer</th>
+                    <th className="px-4 py-3">Issued</th>
+                    <th className="px-4 py-3">Due</th>
+                    <th className="px-4 py-3">Total</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {query.data.items.map((invoice) => (
+                    <tr key={invoice._id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                      <td className="px-5 py-4">
+                        <Link href={`/invoices/${invoice._id}`} className="font-bold text-slate-900 hover:text-indigo-600">
+                          #{invoice.number}
+                        </Link>
+                        <p className="mt-1 text-xs text-slate-400">{invoice.project || invoice.note || "Invoice"}</p>
+                      </td>
+                      <td className="px-4 py-4 text-sm font-semibold text-slate-700">{invoice.customerName}</td>
+                      <td className="px-4 py-4 text-sm text-slate-500">{formatDate(invoice.issueDate)}</td>
+                      <td className="px-4 py-4 text-sm text-slate-500">{formatDate(invoice.dueDate)}</td>
+                      <td className="px-4 py-4 text-sm font-bold text-slate-900">{money(invoice.total, invoice.currency)}</td>
+                      <td className="px-4 py-4">
+                        <Status value={invoice.status} />
+                      </td>
+                      <td className="px-4">
+                        <div className="flex items-center justify-end gap-1">
+                          {invoice.status === "draft" && (
+                            <button
+                              onClick={() => setEditing(invoice)}
+                              aria-label={`Edit invoice ${invoice.number}`}
+                              className="inline-flex rounded-lg p-2 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
+                            >
+                              <Pencil size={18} />
+                            </button>
+                          )}
+                          <Link
+                            href={`/invoices/${invoice._id}`}
+                            aria-label={`Open invoice ${invoice.number}`}
+                            className="inline-flex rounded-lg p-2 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
+                          >
+                            <ArrowUpRight size={18} />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="grid place-items-center px-6 py-16 text-center">
+              <FileText size={32} className="text-slate-300" />
+              <p className="mt-3 text-sm font-semibold text-slate-700">No matching invoices</p>
+              <p className="mt-1 text-xs text-slate-400">Create an invoice or change the current filters.</p>
+            </div>
+          )}
+          {query.data && query.data.total > 0 && (
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-4">
+              <p className="text-xs text-slate-500">
+                Page {query.data.page} of {query.data.pages}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage((value) => value - 1)}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <button
+                  disabled={page >= query.data.pages}
+                  onClick={() => setPage((value) => value + 1)}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+        {creating &&
+          (settingsQuery.isLoading || (opportunityId && opportunityQuery.isLoading) ? (
+            <InvoiceLoadState onClose={() => setCreating(false)} />
+          ) : settingsQuery.isError || (opportunityId && !opportunityQuery.data) ? (
+            <InvoiceLoadState
+              error={opportunityQuery.error?.message || settingsQuery.error?.message || "Invoice details could not be loaded"}
+              onClose={() => setCreating(false)}
+              onRetry={() => {
+                settingsQuery.refetch();
+                if (opportunityId) opportunityQuery.refetch();
+              }}
+            />
+          ) : opportunityId && opportunityQuery.data ? (
+            <OpportunityInvoiceForm data={opportunityQuery.data} settings={settingsQuery.data?.settings} onClose={() => setCreating(false)} />
+          ) : (
+            <InvoiceForm settings={settingsQuery.data?.settings} onClose={() => setCreating(false)} />
+          ))}
+        {editing &&
+          (settingsQuery.isLoading ? (
+            <InvoiceLoadState onClose={() => setEditing(null)} />
+          ) : (
+            <InvoiceForm key={editing._id} invoice={editing} settings={settingsQuery.data?.settings} onClose={() => setEditing(null)} />
+          ))}
+      </div>
+    </CrmShell>
+  );
 }
 
 function InvoiceLoadState({ error, onClose, onRetry }: { error?: string; onClose: () => void; onRetry?: () => void }) {
-  return <div className="fixed inset-0 z-[140] grid place-items-center bg-slate-950/45 p-4"><div role="dialog" aria-modal="true" aria-label="Prepare invoice" className="w-full max-w-lg rounded-2xl bg-white p-6"><p role={error ? "alert" : "status"} className={error ? "text-rose-600" : "text-slate-600"}>{error || "Preparing invoice details…"}</p><div className="mt-5 flex gap-3">{onRetry && <button onClick={onRetry} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm text-white">Retry</button>}<button onClick={onClose} className="rounded-xl border px-4 py-2 text-sm">Close</button></div></div></div>;
+  return (
+    <div className="fixed inset-0 z-[140] grid place-items-center bg-slate-950/45 p-4">
+      <div role="dialog" aria-modal="true" aria-label="Prepare invoice" className="w-full max-w-lg rounded-2xl bg-white p-6">
+        <p role={error ? "alert" : "status"} className={error ? "text-rose-600" : "text-slate-600"}>
+          {error || "Preparing invoice details…"}
+        </p>
+        <div className="mt-5 flex gap-3">
+          {onRetry && (
+            <button onClick={onRetry} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm text-white">
+              Retry
+            </button>
+          )}
+          <button onClick={onClose} className="rounded-xl border px-4 py-2 text-sm">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
-function OpportunityInvoiceForm({ data, settings, onClose }: { data: OpportunityInvoiceData; settings?: FinanceSettings | null; onClose: () => void }) {
+function OpportunityInvoiceForm({
+  data,
+  settings,
+  onClose,
+}: {
+  data: OpportunityInvoiceData;
+  settings?: FinanceSettings | null;
+  onClose: () => void;
+}) {
   const [sourceId, setSourceId] = useState(data.defaultSource);
-  const source = data.sources.find(item => item.id === sourceId) || data.sources[0];
-  return <InvoiceForm key={source.id} settings={settings} initialData={source.draft} onClose={onClose} sourcePicker={<section className="mb-5 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4"><p className="text-sm font-bold">Invoice for {data.opportunity.name}</p><p className="mt-1 text-xs leading-5 text-slate-600">Review the details below. Nothing is saved until you click Create invoice.</p><label className="mt-3 block text-xs font-semibold text-slate-600">Populate from<select aria-label="Populate from" value={source.id} onChange={event => { if (window.confirm("Changing the source replaces the invoice details you have entered. Continue?")) setSourceId(event.target.value); }} className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm">{data.sources.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>{source.estimated && <p className="mt-3 text-sm text-amber-800">This quote contains estimated time. Check the actual hours or days before creating the invoice.</p>}{source.id === "opportunity" && <p className="mt-2 text-xs text-slate-500">The opportunity value is copied as one project item. Check the amount and VAT before saving.</p>}{data.invoices.length > 0 && <div className="mt-3 border-t border-indigo-100 pt-3 text-sm"><p className="font-semibold">This opportunity already has invoices:</p><div className="mt-1 flex flex-wrap gap-3">{data.invoices.map(invoice => <Link key={invoice._id} href={`/invoices/${invoice._id}`} className="text-indigo-700 underline">#{invoice.number} ({invoice.status})</Link>)}</div></div>}</section>} />;
+  const source = data.sources.find((item) => item.id === sourceId) || data.sources[0];
+  return (
+    <InvoiceForm
+      key={source.id}
+      settings={settings}
+      initialData={source.draft}
+      onClose={onClose}
+      sourcePicker={
+        <section className="mb-5 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+          <p className="text-sm font-bold">Invoice for {data.opportunity.name}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-600">Review the details below. Nothing is saved until you click Create invoice.</p>
+          <label className="mt-3 block text-xs font-semibold text-slate-600">
+            Populate from
+            <select
+              aria-label="Populate from"
+              value={source.id}
+              onChange={(event) => {
+                if (window.confirm("Changing the source replaces the invoice details you have entered. Continue?")) setSourceId(event.target.value);
+              }}
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm"
+            >
+              {data.sources.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {source.estimated && (
+            <p className="mt-3 text-sm text-amber-800">
+              This quote contains estimated time. Check the actual hours or days before creating the invoice.
+            </p>
+          )}
+          {source.id === "opportunity" && (
+            <p className="mt-2 text-xs text-slate-500">
+              The opportunity value is copied as one project item. Check the amount and VAT before saving.
+            </p>
+          )}
+          {data.invoices.length > 0 && (
+            <div className="mt-3 border-t border-indigo-100 pt-3 text-sm">
+              <p className="font-semibold">This opportunity already has invoices:</p>
+              <div className="mt-1 flex flex-wrap gap-3">
+                {data.invoices.map((invoice) => (
+                  <Link key={invoice._id} href={`/invoices/${invoice._id}`} className="text-indigo-700 underline">
+                    #{invoice.number} ({invoice.status})
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      }
+    />
+  );
 }
 
-function InvoiceForm({ settings, onClose, initialData, sourcePicker }: { settings?: FinanceSettings | null; onClose: () => void; initialData?: InvoiceSeed; sourcePicker?: ReactNode }) {
+function InvoiceForm({
+  settings,
+  onClose,
+  initialData,
+  sourcePicker,
+  invoice,
+}: {
+  settings?: FinanceSettings | null;
+  onClose: () => void;
+  initialData?: InvoiceSeed;
+  sourcePicker?: ReactNode;
+  invoice?: Invoice;
+}) {
   const queryClient = useQueryClient();
-  const next = useQuery({ queryKey: ["invoice-next-number"], queryFn: () => api<{ number: string }>("/invoices/next-number") });
-  const [company, setCompany] = useState({ value: initialData?.company || "", label: initialData?.companyLabel || "" });
-  const [contact, setContact] = useState(initialData?.contact || "");
+  const next = useQuery({ queryKey: ["invoice-next-number"], queryFn: () => api<{ number: string }>("/invoices/next-number"), enabled: !invoice });
+  const refId = (v: unknown) => (typeof v === "object" && v ? (v as { _id?: string })._id || "" : (v as string) || "");
+  const [company, setCompany] = useState({
+    value: invoice ? refId(invoice.company) : initialData?.company || "",
+    label: invoice
+      ? typeof invoice.company === "object" && invoice.company
+        ? invoice.company.name?.companyName || invoice.customerName
+        : invoice.customerName
+      : initialData?.companyLabel || "",
+  });
+  const [contact, setContact] = useState(invoice ? refId(invoice.contact) : initialData?.contact || "");
   const defaultTerms = settings?.defaultTermsDays ?? 10;
-  const [form, setForm] = useState({ customerName: initialData?.customerName || "", customerContact: initialData?.customerContact || "", billingAddress: initialData?.billingAddress || "", project: initialData?.project || "", purchaseOrder: "", issueDate: today(), supplyDate: today(), dueDate: futureDate(defaultTerms), terms: `${defaultTerms} days`, currency: initialData?.currency || settings?.defaultCurrency || "GBP", credit: initialData?.credit ?? 0, vatRate: initialData?.vatRate ?? (settings?.vatRegistered ? 20 : 0), note: initialData || settings?.vatRegistered ? "" : "This invoice is VAT exempt.", status: "draft" });
-  const [items, setItems] = useState<InvoiceLine[]>(initialData?.lineItems.map(item => ({ ...item })) || [{ description: "", quantity: 1, unit: "hours", rate: 0 }]);
+  const [form, setForm] = useState(
+    invoice
+      ? {
+          customerName: invoice.customerName || "",
+          customerContact: invoice.customerContact || "",
+          billingAddress: invoice.billingAddress || "",
+          project: invoice.project || "",
+          purchaseOrder: invoice.purchaseOrder || "",
+          issueDate: invoice.issueDate.slice(0, 10),
+          supplyDate: (invoice.supplyDate || invoice.issueDate).slice(0, 10),
+          dueDate: invoice.dueDate.slice(0, 10),
+          terms: invoice.terms || `${defaultTerms} days`,
+          currency: invoice.currency || "GBP",
+          credit: invoice.credit ?? 0,
+          vatRate: invoice.vatRate ?? 0,
+          note: invoice.note || "",
+          status: invoice.status,
+        }
+      : {
+          customerName: initialData?.customerName || "",
+          customerContact: initialData?.customerContact || "",
+          billingAddress: initialData?.billingAddress || "",
+          project: initialData?.project || "",
+          purchaseOrder: "",
+          issueDate: today(),
+          supplyDate: today(),
+          dueDate: futureDate(defaultTerms),
+          terms: `${defaultTerms} days`,
+          currency: initialData?.currency || settings?.defaultCurrency || "GBP",
+          credit: initialData?.credit ?? 0,
+          vatRate: initialData?.vatRate ?? (settings?.vatRegistered ? 20 : 0),
+          note: initialData || settings?.vatRegistered ? "" : "This invoice is VAT exempt.",
+          status: "draft" as Invoice["status"],
+        },
+  );
+  const [items, setItems] = useState<InvoiceLine[]>(
+    invoice
+      ? invoice.lineItems.map(({ description, quantity, unit, rate }) => ({ description, quantity, unit, rate }))
+      : initialData?.lineItems.map((item) => ({ ...item })) || [{ description: "", quantity: 1, unit: "hours", rate: 0 }],
+  );
   const [error, setError] = useState("");
-  const mutation = useMutation({ mutationFn: () => api<Invoice>("/invoices", { method: "POST", body: JSON.stringify({ ...form, number: next.data?.number, ...(initialData ? { opportunity: initialData.opportunity, ...(initialData.sourceQuote ? { sourceQuote: initialData.sourceQuote } : {}) } : {}), ...(contact ? { contact } : {}), ...(company.value ? { company: company.value } : {}), issueDate: iso(form.issueDate), supplyDate: iso(form.supplyDate), dueDate: iso(form.dueDate), lineItems: items }) }), onSuccess: (invoice) => { queryClient.invalidateQueries({ queryKey: ["invoices"] }); queryClient.invalidateQueries({ queryKey: ["opportunity-invoice"] }); queryClient.invalidateQueries({ queryKey: ["invoice-next-number"] }); onClose(); if (initialData) window.location.assign(`/invoices/${invoice._id}`); }, onError: (reason) => setError(reason instanceof Error ? reason.message : "Invoice could not be created") });
+  const mutation = useMutation({
+    mutationFn: () => {
+      const payload = {
+        ...form,
+        ...(contact ? { contact } : {}),
+        issueDate: iso(form.issueDate),
+        supplyDate: iso(form.supplyDate),
+        dueDate: iso(form.dueDate),
+        lineItems: items,
+      };
+      if (invoice) {
+        return api<Invoice>(`/invoices/${invoice._id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ ...payload, company: company.value || null }),
+        });
+      }
+      return api<Invoice>("/invoices", {
+        method: "POST",
+        body: JSON.stringify({
+          ...payload,
+          number: next.data?.number,
+          ...(initialData
+            ? { opportunity: initialData.opportunity, ...(initialData.sourceQuote ? { sourceQuote: initialData.sourceQuote } : {}) }
+            : {}),
+          ...(company.value ? { company: company.value } : {}),
+        }),
+      });
+    },
+    onSuccess: (saved) => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice"] }); // detail page cache, adjust to your key
+      if (!invoice) {
+        queryClient.invalidateQueries({ queryKey: ["opportunity-invoice"] });
+        queryClient.invalidateQueries({ queryKey: ["invoice-next-number"] });
+      }
+      onClose();
+      if (initialData && !invoice) window.location.assign(`/invoices/${saved._id}`);
+    },
+    onError: (reason) => setError(reason instanceof Error ? reason.message : "Invoice could not be saved"),
+  });
   const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
-  const subtotal = round(items.reduce((sum, item) => sum + round(Number(item.quantity) * Number(item.rate)), 0)); const taxable = Math.max(0, subtotal - round(form.credit)); const total = round(taxable + round(taxable * form.vatRate / 100));
-  const submit = (event: FormEvent) => { event.preventDefault(); setError(""); if (!next.data?.number) return setError("Invoice number is unavailable. Try again."); if (form.credit > subtotal) return setError("Credit cannot exceed the subtotal."); mutation.mutate(); };
-  return <div className="fixed inset-0 z-[140] grid grid-cols-1 place-items-center overflow-y-auto bg-slate-950/45 p-4"><div role="dialog" aria-modal="true" className="my-8 w-full min-w-0 max-w-4xl rounded-2xl bg-white shadow-2xl"><div className="flex items-start justify-between border-b border-slate-100 px-6 py-5"><div><h2 className="text-lg font-bold">New invoice <span className="text-indigo-600">#{next.data?.number || "…"}</span></h2><p className="mt-1 text-xs text-slate-500">Based on your existing invoice format and cash-flow register.</p></div><button onClick={onClose} aria-label="Close" className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X size={19} /></button></div><form onSubmit={submit} className="p-6">{sourcePicker}{next.isError && <p role="alert" className="mb-4 text-sm text-rose-600">Invoice number could not be loaded. <button type="button" className="underline" onClick={() => next.refetch()}>Retry</button></p>}<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><AsyncCombobox label="CRM company (optional)" endpoint="/companies/lookup" value={company.value} selectedLabel={company.label} emptyLabel="Choose company" onChange={(option) => { setCompany({ value: option?.value || "", label: option?.label || "" }); setContact(""); if (option) setForm((current) => ({ ...current, customerName: option.label })); }} /><Field label="Customer name" value={form.customerName} onChange={(customerName) => setForm({ ...form, customerName })} required /><Field label="Contact / attention" value={form.customerContact} onChange={(customerContact) => setForm({ ...form, customerContact })} /><Field label="Issue date" type="date" value={form.issueDate} onChange={(issueDate) => setForm({ ...form, issueDate })} required /><Field label="Supply date" type="date" value={form.supplyDate} onChange={(supplyDate) => setForm({ ...form, supplyDate })} /><Field label="Due date" type="date" value={form.dueDate} onChange={(dueDate) => setForm({ ...form, dueDate })} required /><Field label="Project" value={form.project} onChange={(project) => setForm({ ...form, project })} /><label><span className="mb-1.5 block text-xs font-semibold text-slate-600">Currency</span><select aria-label="Currency" value={form.currency} onChange={event => setForm({ ...form, currency: event.target.value })} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">{Array.from(new Set([form.currency, "GBP", "EUR", "USD", "RON", "HUF"])).map(currency => <option key={currency}>{currency}</option>)}</select></label><Field label="P.O. number" value={form.purchaseOrder} onChange={(purchaseOrder) => setForm({ ...form, purchaseOrder })} /><Field label="Terms" value={form.terms} onChange={(terms) => setForm({ ...form, terms })} /><label className="sm:col-span-2 lg:col-span-3"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Billing address</span><textarea value={form.billingAddress} onChange={(event) => setForm({ ...form, billingAddress: event.target.value })} rows={2} className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100" /></label></div>
-    <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200"><div className="min-w-[650px]"><div className="grid grid-cols-[1fr_90px_90px_110px_42px] gap-2 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400"><span>Description</span><span>Quantity</span><span>Unit</span><span>Rate</span><span /></div>{items.map((item, index) => <div key={index} className="grid grid-cols-[1fr_90px_90px_110px_42px] gap-2 border-t border-slate-100 p-3"><input aria-label={`Item ${index + 1} description`} value={item.description} onChange={(event) => setItems(items.map((value, position) => position === index ? { ...value, description: event.target.value } : value))} required className="h-10 rounded-lg border border-slate-200 px-3 text-sm" /><input aria-label="Quantity" type="number" min="0" step="any" value={item.quantity} onChange={(event) => setItems(items.map((value, position) => position === index ? { ...value, quantity: Number(event.target.value) } : value))} className="h-10 rounded-lg border border-slate-200 px-2 text-sm" /><input aria-label="Unit" value={item.unit} onChange={(event) => setItems(items.map((value, position) => position === index ? { ...value, unit: event.target.value } : value))} className="h-10 rounded-lg border border-slate-200 px-2 text-sm" /><input aria-label="Rate" type="number" min="0" step="any" value={item.rate} onChange={(event) => setItems(items.map((value, position) => position === index ? { ...value, rate: Number(event.target.value) } : value))} className="h-10 rounded-lg border border-slate-200 px-2 text-sm" /><button type="button" disabled={items.length === 1} onClick={() => setItems(items.filter((_, position) => position !== index))} className="grid size-10 place-items-center rounded-lg text-rose-500 hover:bg-rose-50 disabled:opacity-30"><Trash2 size={16} /></button></div>)}</div></div><button type="button" onClick={() => setItems([...items, { description: "", quantity: 1, unit: "hours", rate: 0 }])} className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-indigo-600"><Plus size={15} />Add line item</button>
-    <div className="mt-6 grid gap-4 sm:grid-cols-2"><div><Field label="Invoice note" value={form.note} onChange={(note) => setForm({ ...form, note })} /><div className="mt-4 grid grid-cols-2 gap-3"><Field label="Credit" type="number" value={String(form.credit)} onChange={(credit) => setForm({ ...form, credit: Number(credit) })} /><Field label="VAT %" type="number" value={String(form.vatRate)} onChange={(vatRate) => setForm({ ...form, vatRate: Number(vatRate) })} /></div></div><div className="rounded-xl bg-slate-950 p-5 text-white"><div className="flex justify-between text-sm text-slate-400"><span>Subtotal</span><span>{money(subtotal, form.currency)}</span></div><div className="mt-2 flex justify-between text-sm text-slate-400"><span>Credit</span><span>− {money(form.credit, form.currency)}</span></div><div className="mt-4 flex justify-between border-t border-white/10 pt-4 text-lg font-bold"><span>Total</span><span>{money(total, form.currency)}</span></div></div></div>{error && <p className="mt-4 text-sm text-rose-600">{error}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">Cancel</button><button disabled={mutation.isPending || !next.data?.number} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><CirclePoundSterling size={17} />{mutation.isPending ? "Creating…" : "Create invoice"}</button></div></form></div></div>;
+  const subtotal = round(items.reduce((sum, item) => sum + round(Number(item.quantity) * Number(item.rate)), 0));
+  const taxable = Math.max(0, subtotal - round(form.credit));
+  const total = round(taxable + round((taxable * form.vatRate) / 100));
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    if (!invoice && !next.data?.number) return setError("Invoice number is unavailable. Try again.");
+    if (form.credit > subtotal) return setError("Credit cannot exceed the subtotal.");
+    mutation.mutate();
+  };
+  return (
+    <div className="fixed inset-0 z-[140] grid grid-cols-1 place-items-center overflow-y-auto bg-slate-950/45 p-4">
+      <div role="dialog" aria-modal="true" className="my-8 w-full min-w-0 max-w-4xl rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+          <div>
+            <h2 className="text-lg font-bold">
+              {invoice ? "Edit invoice" : "New invoice"} <span className="text-indigo-600">#{invoice?.number ?? next.data?.number ?? "…"}</span>
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">Based on your existing invoice format and cash-flow register.</p>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="rounded-lg p-2 text-slate-400 hover:bg-slate-100">
+            <X size={19} />
+          </button>
+        </div>
+        <form onSubmit={submit} className="p-6">
+          {sourcePicker}
+          {!invoice && !next.isError && (
+            <p role="alert" className="mb-4 text-sm text-rose-600">
+              Invoice number could not be loaded.{" "}
+              <button type="button" className="underline" onClick={() => next.refetch()}>
+                Retry
+              </button>
+            </p>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <AsyncCombobox
+              label="CRM company (optional)"
+              endpoint="/companies/lookup"
+              value={company.value}
+              selectedLabel={company.label}
+              emptyLabel="Choose company"
+              onChange={(option) => {
+                setCompany({ value: option?.value || "", label: option?.label || "" });
+                setContact("");
+                if (option) setForm((current) => ({ ...current, customerName: option.label }));
+              }}
+            />
+            <Field label="Customer name" value={form.customerName} onChange={(customerName) => setForm({ ...form, customerName })} required />
+            <Field label="Contact / attention" value={form.customerContact} onChange={(customerContact) => setForm({ ...form, customerContact })} />
+            <Field label="Issue date" type="date" value={form.issueDate} onChange={(issueDate) => setForm({ ...form, issueDate })} required />
+            <Field label="Supply date" type="date" value={form.supplyDate} onChange={(supplyDate) => setForm({ ...form, supplyDate })} />
+            <Field label="Due date" type="date" value={form.dueDate} onChange={(dueDate) => setForm({ ...form, dueDate })} required />
+            <Field label="Project" value={form.project} onChange={(project) => setForm({ ...form, project })} />
+            <label>
+              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Currency</span>
+              <select
+                aria-label="Currency"
+                value={form.currency}
+                onChange={(event) => setForm({ ...form, currency: event.target.value })}
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+              >
+                {Array.from(new Set([form.currency, "GBP", "EUR", "USD", "RON", "HUF"])).map((currency) => (
+                  <option key={currency}>{currency}</option>
+                ))}
+              </select>
+            </label>
+            <Field label="P.O. number" value={form.purchaseOrder} onChange={(purchaseOrder) => setForm({ ...form, purchaseOrder })} />
+            <Field label="Terms" value={form.terms} onChange={(terms) => setForm({ ...form, terms })} />
+            <label className="sm:col-span-2 lg:col-span-3">
+              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Billing address</span>
+              <textarea
+                value={form.billingAddress}
+                onChange={(event) => setForm({ ...form, billingAddress: event.target.value })}
+                rows={2}
+                className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
+              />
+            </label>
+          </div>
+          <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200">
+            <div className="min-w-[650px]">
+              <div className="grid grid-cols-[1fr_90px_90px_110px_42px] gap-2 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <span>Description</span>
+                <span>Quantity</span>
+                <span>Unit</span>
+                <span>Rate</span>
+                <span />
+              </div>
+              {items.map((item, index) => (
+                <div key={index} className="grid grid-cols-[1fr_90px_90px_110px_42px] gap-2 border-t border-slate-100 p-3">
+                  <input
+                    aria-label={`Item ${index + 1} description`}
+                    value={item.description}
+                    onChange={(event) =>
+                      setItems(items.map((value, position) => (position === index ? { ...value, description: event.target.value } : value)))
+                    }
+                    required
+                    className="h-10 rounded-lg border border-slate-200 px-3 text-sm"
+                  />
+                  <input
+                    aria-label="Quantity"
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={item.quantity}
+                    onChange={(event) =>
+                      setItems(items.map((value, position) => (position === index ? { ...value, quantity: Number(event.target.value) } : value)))
+                    }
+                    className="h-10 rounded-lg border border-slate-200 px-2 text-sm"
+                  />
+                  <input
+                    aria-label="Unit"
+                    value={item.unit}
+                    onChange={(event) =>
+                      setItems(items.map((value, position) => (position === index ? { ...value, unit: event.target.value } : value)))
+                    }
+                    className="h-10 rounded-lg border border-slate-200 px-2 text-sm"
+                  />
+                  <input
+                    aria-label="Rate"
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={item.rate}
+                    onChange={(event) =>
+                      setItems(items.map((value, position) => (position === index ? { ...value, rate: Number(event.target.value) } : value)))
+                    }
+                    className="h-10 rounded-lg border border-slate-200 px-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={items.length === 1}
+                    onClick={() => setItems(items.filter((_, position) => position !== index))}
+                    className="grid size-10 place-items-center rounded-lg text-rose-500 hover:bg-rose-50 disabled:opacity-30"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setItems([...items, { description: "", quantity: 1, unit: "hours", rate: 0 }])}
+            className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-indigo-600"
+          >
+            <Plus size={15} />
+            Add line item
+          </button>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div>
+              <Field label="Invoice note" value={form.note} onChange={(note) => setForm({ ...form, note })} />
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <Field label="Credit" type="number" value={String(form.credit)} onChange={(credit) => setForm({ ...form, credit: Number(credit) })} />
+                <Field
+                  label="VAT %"
+                  type="number"
+                  value={String(form.vatRate)}
+                  onChange={(vatRate) => setForm({ ...form, vatRate: Number(vatRate) })}
+                />
+              </div>
+            </div>
+            <div className="rounded-xl bg-slate-950 p-5 text-white">
+              <div className="flex justify-between text-sm text-slate-400">
+                <span>Subtotal</span>
+                <span>{money(subtotal, form.currency)}</span>
+              </div>
+              <div className="mt-2 flex justify-between text-sm text-slate-400">
+                <span>Credit</span>
+                <span>− {money(form.credit, form.currency)}</span>
+              </div>
+              <div className="mt-4 flex justify-between border-t border-white/10 pt-4 text-lg font-bold">
+                <span>Total</span>
+                <span>{money(total, form.currency)}</span>
+              </div>
+            </div>
+          </div>
+          {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
+          <div className="mt-6 flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">
+              Cancel
+            </button>
+            <button
+              disabled={mutation.isPending || (!invoice && !next.data?.number)}
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              <CirclePoundSterling size={17} />
+              {mutation.isPending ? "Saving…" : invoice ? "Save changes" : "Create invoice"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
 
-function Field({ label, value, onChange, type = "text", required }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean }) { return <label><span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span><input type={type} value={value} onChange={(event) => onChange(event.target.value)} required={required} min={type === "number" ? 0 : undefined} step={type === "number" ? "0.01" : undefined} className="h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100" /></label>; }
-function Stat({ label, value, alert }: { label: string; value: string; alert?: boolean }) { return <article className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-sm text-slate-500">{label}</p><p className={`mt-2 text-2xl font-bold ${alert ? "text-amber-600" : "text-slate-950"}`}>{value}</p></article>; }
-function Status({ value }: { value: Invoice["status"] }) { const tones = { draft: "bg-slate-100 text-slate-600", sent: "bg-sky-50 text-sky-700", paid: "bg-emerald-50 text-emerald-700", overdue: "bg-rose-50 text-rose-700", void: "bg-slate-100 text-slate-400" }; return <span className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${tones[value]}`}>{value}</span>; }
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  required?: boolean;
+}) {
+  return (
+    <label>
+      <span className="mb-1.5 block text-xs font-semibold text-slate-600">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        required={required}
+        min={type === "number" ? 0 : undefined}
+        step={type === "number" ? "0.01" : undefined}
+        className="h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm outline-none focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
+      />
+    </label>
+  );
+}
+function Stat({ label, value, alert }: { label: string; value: string; alert?: boolean }) {
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-5">
+      <p className="text-sm text-slate-500">{label}</p>
+      <p className={`mt-2 text-2xl font-bold ${alert ? "text-amber-600" : "text-slate-950"}`}>{value}</p>
+    </article>
+  );
+}
+function Status({ value }: { value: Invoice["status"] }) {
+  const tones = {
+    draft: "bg-slate-100 text-slate-600",
+    sent: "bg-sky-50 text-sky-700",
+    paid: "bg-emerald-50 text-emerald-700",
+    overdue: "bg-rose-50 text-rose-700",
+    void: "bg-slate-100 text-slate-400",
+  };
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${tones[value]}`}>{value}</span>;
+}
