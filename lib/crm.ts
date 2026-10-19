@@ -45,6 +45,7 @@ export type Interaction = {
   physicalAddress?: string;
   leadStatus?: string;
   note?: string;
+  link?: string;
   followUpAt?: string | null;
   followUpNote?: string;
   company?: string | { _id: string; name?: { companyName?: string } };
