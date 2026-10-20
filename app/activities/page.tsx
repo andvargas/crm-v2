@@ -1,12 +1,13 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, FilterX, Link2, Mail, MessageSquarePlus, Pencil, Phone, Radio, SearchCheck, UserPlus, X } from "lucide-react";
+import { ArrowUpRight, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, FilterX, Globe, Link2, Mail, MessageSquarePlus, Pencil, Phone, Radio, SearchCheck, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AsyncCombobox } from "../../components/async-combobox";
 import { CrmShell } from "../../components/crm-shell";
 import { InteractionEditor } from "../../components/interaction-editor";
 import { ActivityContactModal } from "../../components/activity-contact-modal";
+import { Tooltip } from "../../components/tooltip";
 import { api } from "../../lib/api";
 import { Interaction, formatDate } from "../../lib/crm";
 
@@ -92,8 +93,9 @@ export default function ActivitiesPage() {
               {!activity.contact && <button type="button" onClick={() => setContactAction({ interaction: activity, mode: "create" })} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><UserPlus size={14} />Create contact</button>}
               <button type="button" onClick={() => setContactAction({ interaction: activity, mode: "assign" })} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><Link2 size={14} />{activity.contact ? "Change contact" : "Assign contact"}</button>
               <button type="button" onClick={() => setFollowUp(activity)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold ${activity.followUpAt ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-white text-slate-700"}`}><CalendarClock size={14} />{activity.followUpAt ? `Follow up ${formatDate(activity.followUpAt)}` : "Follow up"}</button>
-              <button type="button" onClick={() => setEditingInteraction(activity)} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><Pencil size={14} />Edit activity</button>
               <button type="button" onClick={() => setEditingInteraction(activity)} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white"><MessageSquarePlus size={14} />Add message</button>
+              <Tooltip label="Edit activity">{(tip) => <button type="button" onClick={() => setEditingInteraction(activity)} aria-label="Edit activity" aria-describedby={tip} className="flex items-center rounded-lg border border-slate-200 bg-white px-2.5 text-slate-700 hover:bg-slate-50"><Pencil size={14} /></button>}</Tooltip>
+              {/^https?:\/\//i.test(activity.link?.trim() || "") ? <Tooltip label="Open link">{(tip) => <a href={activity.link!.trim()} target="_blank" rel="noopener noreferrer" aria-label="Open link" aria-describedby={tip} className="flex items-center rounded-lg border border-slate-200 bg-white px-2.5 text-indigo-600 hover:bg-indigo-50"><Globe size={14} /></a>}</Tooltip> : <Tooltip label="No link added">{(tip) => <button type="button" aria-disabled="true" aria-label="Open link" aria-describedby={tip} className="flex cursor-not-allowed items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-slate-300"><Globe size={14} /></button>}</Tooltip>}
             </div>
             {activity.contact && typeof activity.contact === "object" && <ActivityContactCard contact={activity.contact} company={companyLabel(activity)} />}
             <div className="grid gap-5 lg:grid-cols-[.7fr_1.3fr]"><div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Activity note</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{activity.note || "No note recorded."}</p></div><div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Conversation · {activity.comms?.length ?? 0} messages</p><div className="mt-2 max-h-64 space-y-2 overflow-y-auto">{activity.comms?.length ? [...activity.comms].reverse().map((message, index) => <div key={message._id || index} className="rounded-xl border border-slate-200 bg-white p-3"><p className="whitespace-pre-wrap text-sm leading-5 text-slate-700">{message.outcome || "Empty message"}</p><p className="mt-2 text-[11px] text-slate-400">{formatDate(message.timeStamp)}</p></div>) : <p className="rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-400">No messages recorded.</p>}</div></div></div>

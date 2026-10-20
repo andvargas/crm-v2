@@ -88,8 +88,12 @@ export type FinanceSettings = {
   vatRegistered: boolean; vatNumber?: string; defaultTermsDays: number; defaultCurrency: string; invoiceFooter?: string;
 };
 
+/** "personal", "freelance", or the _id of a custom budget created in Settings. */
+export type BudgetScope = string;
+export type BudgetBook = { _id: string; name: string; currency?: string; archivedAt?: string | null; transactions: number; createdAt?: string };
+
 export type BudgetTransaction = {
-  _id: string; scope: "personal" | "freelance"; transactionType: "income" | "expense"; date: string; amount: number;
+  _id: string; scope: BudgetScope; transactionType: "income" | "expense"; date: string; amount: number;
   currency: string; counterparty?: string; category?: string; note?: string; project?: string; invoiceReference?: string;
   taxTreatment?: string; hmrcDeductible?: boolean; dwpDeductible?: boolean; source?: "crm" | "cashflow-import";
 };
