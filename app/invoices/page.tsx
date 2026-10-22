@@ -8,7 +8,9 @@ import { AsyncCombobox } from "../../components/async-combobox";
 import { CrmShell } from "../../components/crm-shell";
 import { SafeLink as Link } from "../../components/safe-link";
 import { api } from "../../lib/api";
-import { FinanceSettings, Invoice, InvoiceLine, formatDate } from "../../lib/crm";
+import { Company, Contact, FinanceSettings, Invoice, InvoiceLine, addressLines, billingAddress, formatDate } from "../../lib/crm";
+import { CustomerRatePanel, CustomerRateLookup, useCustomerRate } from "../../components/quote-customer-rate";
+import { InvoicePricingType, TimeUnit, blankInvoiceLine, formatHours, isHourly, normalizeInvoiceLine, parseHours } from "../../lib/invoice-lines";
 
 type InvoiceResponse = {
   items: Invoice[];
@@ -25,6 +27,14 @@ const futureDate = (days: number) => {
 };
 const iso = (date: string) => new Date(`${date}T12:00:00.000Z`).toISOString();
 const money = (value: number, currency = "GBP") => new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(value || 0);
+const contactName = (contact: Contact) =>
+  contact.name?.fullName || [contact.name?.firstName, contact.name?.lastName].filter(Boolean).join(" ") || contact.email || "";
+const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+// Rows get a stable client-only key so per-row input state survives removing a row above it.
+type EditableLine = InvoiceLine & { key: string };
+let lineKey = 0;
+const editable = (line: InvoiceLine): EditableLine => ({ ...normalizeInvoiceLine(line), key: `line-${++lineKey}` });
 
 type InvoiceSeed = {
   opportunity: string;
@@ -359,7 +369,17 @@ function InvoiceForm({
         : invoice.customerName
       : initialData?.companyLabel || "",
   });
-  const [contact, setContact] = useState(invoice ? refId(invoice.contact) : initialData?.contact || "");
+  const [contact, setContact] = useState({
+    value: invoice ? refId(invoice.contact) : initialData?.contact || "",
+    label: invoice
+      ? typeof invoice.contact === "object" && invoice.contact
+        ? contactName(invoice.contact) || invoice.customerContact || ""
+        : invoice.customerContact || ""
+      : initialData?.customerContact || "",
+  });
+  // Who is billed: a company (with an optional contact), or just a contact for a sole trader. Required before anything else.
+  const [billTo, setBillTo] = useState<"company" | "contact">(company.value || !contact.value ? "company" : "contact");
+  const hasCustomer = billTo === "company" ? Boolean(company.value) : Boolean(contact.value);
   const defaultTerms = settings?.defaultTermsDays ?? 10;
   const [form, setForm] = useState(
     invoice
@@ -396,26 +416,46 @@ function InvoiceForm({
           status: "draft" as Invoice["status"],
         },
   );
-  const [items, setItems] = useState<InvoiceLine[]>(
-    invoice
-      ? invoice.lineItems.map(({ description, quantity, unit, rate }) => ({ description, quantity, unit, rate }))
-      : initialData?.lineItems.map((item) => ({ ...item })) || [{ description: "", quantity: 1, unit: "hours", rate: 0 }],
+  const [items, setItems] = useState<EditableLine[]>(() =>
+    (invoice
+      ? invoice.lineItems.map(({ pricingType, description, quantity, unit, rate }) => ({ pricingType, description, quantity, unit, rate }))
+      : initialData?.lineItems || [blankInvoiceLine()]
+    ).map(editable),
   );
+  const updateItem = (key: string, fields: Partial<InvoiceLine>) => setItems(items.map((item) => (item.key === key ? { ...item, ...fields } : item)));
+  const rateLookup: CustomerRateLookup = {
+    endpoint: "/invoices/customer-rate",
+    params: billTo === "company" ? (company.value ? { company: company.value } : {}) : contact.value ? { contact: contact.value } : {},
+  };
+  const savedRate = useCustomerRate(rateLookup, form.currency).data?.hourlyRate ?? null;
+  // When the customer's saved rate arrives or changes, fill hourly lines that have no rate yet; typed rates are kept.
+  const [filledRate, setFilledRate] = useState<number | null>(null);
+  if (savedRate !== filledRate) {
+    setFilledRate(savedRate);
+    if (savedRate !== null && items.some((item) => isHourly(item) && !item.rate))
+      setItems(items.map((item) => (isHourly(item) && !item.rate ? { ...item, rate: savedRate } : item)));
+  }
+  const changeType = (item: EditableLine, pricingType: InvoicePricingType) =>
+    updateItem(
+      item.key,
+      pricingType === "time" ? { pricingType, unit: "hour", ...(!item.rate && savedRate !== null ? { rate: savedRate } : {}) } : { pricingType, quantity: 1, unit: "item" },
+    );
+  const changeUnit = (item: EditableLine, unit: TimeUnit) =>
+    updateItem(item.key, unit === "hour" && !item.rate && savedRate !== null ? { unit, rate: savedRate } : { unit });
   const [error, setError] = useState("");
   const mutation = useMutation({
     mutationFn: () => {
       const payload = {
         ...form,
-        ...(contact ? { contact } : {}),
         issueDate: iso(form.issueDate),
         supplyDate: iso(form.supplyDate),
         dueDate: iso(form.dueDate),
-        lineItems: items,
+        lineItems: items.map(({ pricingType, description, quantity, unit, rate }) => ({ pricingType, description, quantity, unit, rate })),
       };
       if (invoice) {
         return api<Invoice>(`/invoices/${invoice._id}`, {
           method: "PATCH",
-          body: JSON.stringify({ ...payload, company: company.value || null }),
+          body: JSON.stringify({ ...payload, company: (billTo === "company" && company.value) || null, contact: contact.value || null }),
         });
       }
       return api<Invoice>("/invoices", {
@@ -426,7 +466,8 @@ function InvoiceForm({
           ...(initialData
             ? { opportunity: initialData.opportunity, ...(initialData.sourceQuote ? { sourceQuote: initialData.sourceQuote } : {}) }
             : {}),
-          ...(company.value ? { company: company.value } : {}),
+          ...(billTo === "company" && company.value ? { company: company.value } : {}),
+          ...(contact.value ? { contact: contact.value } : {}),
         }),
       });
     },
@@ -442,13 +483,13 @@ function InvoiceForm({
     },
     onError: (reason) => setError(reason instanceof Error ? reason.message : "Invoice could not be saved"),
   });
-  const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
   const subtotal = round(items.reduce((sum, item) => sum + round(Number(item.quantity) * Number(item.rate)), 0));
   const taxable = Math.max(0, subtotal - round(form.credit));
   const total = round(taxable + round((taxable * form.vatRate) / 100));
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setError("");
+    if (!hasCustomer) return setError(billTo === "company" ? "Choose the company you are invoicing first." : "Choose the contact you are invoicing first.");
     if (!invoice && !next.data?.number) return setError("Invoice number is unavailable. Try again.");
     if (form.credit > subtotal) return setError("Credit cannot exceed the subtotal.");
     mutation.mutate();
@@ -469,7 +510,7 @@ function InvoiceForm({
         </div>
         <form onSubmit={submit} className="p-6">
           {sourcePicker}
-          {!invoice && !next.isError && (
+          {!invoice && next.isError && (
             <p role="alert" className="mb-4 text-sm text-rose-600">
               Invoice number could not be loaded.{" "}
               <button type="button" className="underline" onClick={() => next.refetch()}>
@@ -477,19 +518,87 @@ function InvoiceForm({
               </button>
             </p>
           )}
+          <section className="mb-5 rounded-xl border border-slate-200 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-bold">Bill to</p>
+              <div role="radiogroup" aria-label="Bill to" className="flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
+                {(
+                  [
+                    ["company", "Company"],
+                    ["contact", "Contact (sole trader)"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={billTo === value}
+                    onClick={() => {
+                      setBillTo(value);
+                      setError("");
+                    }}
+                    className={`rounded-md px-3 py-1.5 ${billTo === value ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              {billTo === "company" && (
+                <AsyncCombobox
+                  label="Company"
+                  endpoint="/companies/lookup"
+                  value={company.value}
+                  selectedLabel={company.label}
+                  emptyLabel="Choose company"
+                  placeholder="Search companies…"
+                  onChange={(option) => {
+                    setCompany({ value: option?.value || "", label: option?.label || "" });
+                    setContact({ value: "", label: "" });
+                    setError("");
+                    if (!option) return;
+                    setForm((current) => ({ ...current, customerName: option.label }));
+                    // Fill an empty billing address from the company's saved billing address.
+                    api<Company>(`/companies/${option.value}`)
+                      .then((record) => {
+                        const address = addressLines(billingAddress(record)).join("\n");
+                        if (address) setForm((current) => (current.billingAddress.trim() ? current : { ...current, billingAddress: address }));
+                      })
+                      .catch(() => undefined);
+                  }}
+                />
+              )}
+              <AsyncCombobox
+                label={billTo === "company" ? "Contact (optional)" : "Contact"}
+                endpoint="/contacts/lookup"
+                value={contact.value}
+                selectedLabel={contact.label}
+                emptyLabel="Choose contact"
+                placeholder="Search contacts…"
+                onChange={(option) => {
+                  setContact({ value: option?.value || "", label: option?.label || "" });
+                  setError("");
+                  if (option)
+                    setForm((current) => ({
+                      ...current,
+                      customerContact: option.label,
+                      ...(billTo === "contact" ? { customerName: option.label } : {}),
+                    }));
+                }}
+              />
+            </div>
+            {!hasCustomer && (
+              <p role="status" className="mt-3 text-sm text-amber-700">
+                {billTo === "company"
+                  ? "Choose the company you are invoicing first. For a sole trader, switch to Contact."
+                  : "Choose the contact you are invoicing first."}{" "}
+                The invoice details unlock once a customer is selected.
+              </p>
+            )}
+          </section>
+          <fieldset disabled={!hasCustomer} className="min-w-0 transition-opacity disabled:opacity-50">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <AsyncCombobox
-              label="CRM company (optional)"
-              endpoint="/companies/lookup"
-              value={company.value}
-              selectedLabel={company.label}
-              emptyLabel="Choose company"
-              onChange={(option) => {
-                setCompany({ value: option?.value || "", label: option?.label || "" });
-                setContact("");
-                if (option) setForm((current) => ({ ...current, customerName: option.label }));
-              }}
-            />
             <Field label="Customer name" value={form.customerName} onChange={(customerName) => setForm({ ...form, customerName })} required />
             <Field label="Contact / attention" value={form.customerContact} onChange={(customerContact) => setForm({ ...form, customerContact })} />
             <Field label="Issue date" type="date" value={form.issueDate} onChange={(issueDate) => setForm({ ...form, issueDate })} required />
@@ -522,75 +631,118 @@ function InvoiceForm({
             </label>
           </div>
           <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200">
-            <div className="min-w-[650px]">
-              <div className="grid grid-cols-[1fr_90px_90px_110px_42px] gap-2 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            <div className="min-w-[860px]">
+              <div className="grid grid-cols-[170px_1fr_90px_90px_110px_100px_42px] gap-2 bg-slate-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <span>Type</span>
                 <span>Description</span>
-                <span>Quantity</span>
+                <span>Qty / time</span>
                 <span>Unit</span>
                 <span>Rate</span>
+                <span className="text-right">Amount</span>
                 <span />
               </div>
-              {items.map((item, index) => (
-                <div key={index} className="grid grid-cols-[1fr_90px_90px_110px_42px] gap-2 border-t border-slate-100 p-3">
-                  <input
-                    aria-label={`Item ${index + 1} description`}
-                    value={item.description}
-                    onChange={(event) =>
-                      setItems(items.map((value, position) => (position === index ? { ...value, description: event.target.value } : value)))
-                    }
-                    required
-                    className="h-10 rounded-lg border border-slate-200 px-3 text-sm"
-                  />
-                  <input
-                    aria-label="Quantity"
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={item.quantity}
-                    onChange={(event) =>
-                      setItems(items.map((value, position) => (position === index ? { ...value, quantity: Number(event.target.value) } : value)))
-                    }
-                    className="h-10 rounded-lg border border-slate-200 px-2 text-sm"
-                  />
-                  <input
-                    aria-label="Unit"
-                    value={item.unit}
-                    onChange={(event) =>
-                      setItems(items.map((value, position) => (position === index ? { ...value, unit: event.target.value } : value)))
-                    }
-                    className="h-10 rounded-lg border border-slate-200 px-2 text-sm"
-                  />
-                  <input
-                    aria-label="Rate"
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={item.rate}
-                    onChange={(event) =>
-                      setItems(items.map((value, position) => (position === index ? { ...value, rate: Number(event.target.value) } : value)))
-                    }
-                    className="h-10 rounded-lg border border-slate-200 px-2 text-sm"
-                  />
-                  <button
-                    type="button"
-                    disabled={items.length === 1}
-                    onClick={() => setItems(items.filter((_, position) => position !== index))}
-                    className="grid size-10 place-items-center rounded-lg text-rose-500 hover:bg-rose-50 disabled:opacity-30"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
+              {items.map((item, index) => {
+                const time = item.pricingType === "time";
+                return (
+                  <div key={item.key} className="grid grid-cols-[170px_1fr_90px_90px_110px_100px_42px] items-center gap-2 border-t border-slate-100 p-3">
+                    <select
+                      aria-label={`Item ${index + 1} type`}
+                      value={item.pricingType}
+                      onChange={(event) => changeType(item, event.target.value as InvoicePricingType)}
+                      className="h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm"
+                    >
+                      <option value="fixed">Fixed item / product</option>
+                      <option value="time">Time</option>
+                    </select>
+                    <input
+                      aria-label={`Item ${index + 1} description`}
+                      value={item.description}
+                      onChange={(event) => updateItem(item.key, { description: event.target.value })}
+                      required
+                      className="h-10 rounded-lg border border-slate-200 px-3 text-sm"
+                    />
+                    {time && item.unit === "hour" ? (
+                      <HoursInput label={`Item ${index + 1} time (h:mm)`} hours={item.quantity} onChange={(quantity) => updateItem(item.key, { quantity })} />
+                    ) : (
+                      <input
+                        aria-label={time ? `Item ${index + 1} days` : `Item ${index + 1} quantity`}
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={item.quantity}
+                        onChange={(event) => updateItem(item.key, { quantity: Number(event.target.value) })}
+                        className="h-10 rounded-lg border border-slate-200 px-2 text-sm"
+                      />
+                    )}
+                    {time ? (
+                      <select
+                        aria-label={`Item ${index + 1} time unit`}
+                        value={item.unit}
+                        onChange={(event) => changeUnit(item, event.target.value as TimeUnit)}
+                        className="h-10 rounded-lg border border-slate-200 bg-white px-2 text-sm"
+                      >
+                        <option value="hour">Hours</option>
+                        <option value="day">Days</option>
+                      </select>
+                    ) : (
+                      <input
+                        aria-label={`Item ${index + 1} unit`}
+                        value={item.unit}
+                        onChange={(event) => updateItem(item.key, { unit: event.target.value })}
+                        className="h-10 rounded-lg border border-slate-200 px-2 text-sm"
+                      />
+                    )}
+                    <input
+                      aria-label={time ? `Item ${index + 1} rate per ${item.unit}` : `Item ${index + 1} unit price`}
+                      title={time ? `Rate per ${item.unit}` : "Unit price"}
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={item.rate}
+                      onChange={(event) => updateItem(item.key, { rate: Number(event.target.value) })}
+                      className="h-10 rounded-lg border border-slate-200 px-2 text-sm"
+                    />
+                    <span className="text-right text-sm font-semibold text-slate-700">{money(round(Number(item.quantity) * Number(item.rate)), form.currency)}</span>
+                    <button
+                      type="button"
+                      aria-label={`Remove item ${index + 1}`}
+                      disabled={items.length === 1}
+                      onClick={() => setItems(items.filter((value) => value.key !== item.key))}
+                      className="grid size-10 place-items-center rounded-lg text-rose-500 hover:bg-rose-50 disabled:opacity-30"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setItems([...items, { description: "", quantity: 1, unit: "hours", rate: 0 }])}
-            className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-indigo-600"
-          >
-            <Plus size={15} />
-            Add line item
-          </button>
+          <div className="mt-3 flex flex-wrap gap-4">
+            <button
+              type="button"
+              onClick={() => setItems([...items, editable(blankInvoiceLine("fixed"))])}
+              className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600"
+            >
+              <Plus size={15} />
+              Add item
+            </button>
+            <button
+              type="button"
+              onClick={() => setItems([...items, editable(blankInvoiceLine("time", savedRate ?? 0))])}
+              className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600"
+            >
+              <Plus size={15} />
+              Add time
+            </button>
+          </div>
+          <CustomerRatePanel
+            lookup={rateLookup}
+            document="invoice"
+            missing="Choose a CRM company to use its saved hourly rate. You can still enter a rate on each item."
+            currency={form.currency}
+            hasHourlyItems={items.some(isHourly)}
+            onApply={(rate) => setItems(items.map((item) => (isHourly(item) ? { ...item, rate } : item)))}
+          />
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <div>
               <Field label="Invoice note" value={form.note} onChange={(note) => setForm({ ...form, note })} />
@@ -619,13 +771,14 @@ function InvoiceForm({
               </div>
             </div>
           </div>
+          </fieldset>
           {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
           <div className="mt-6 flex justify-end gap-2">
             <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">
               Cancel
             </button>
             <button
-              disabled={mutation.isPending || (!invoice && !next.data?.number)}
+              disabled={mutation.isPending || !hasCustomer || (!invoice && !next.data?.number)}
               className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
             >
               <CirclePoundSterling size={17} />
@@ -635,6 +788,32 @@ function InvoiceForm({
         </form>
       </div>
     </div>
+  );
+}
+
+// Time is typed as h:mm (1:45) or decimal hours (1.75) and reported to the form as decimal hours.
+function HoursInput({ label, hours, onChange }: { label: string; hours: number; onChange: (hours: number) => void }) {
+  const [text, setText] = useState(() => formatHours(hours));
+  return (
+    <input
+      aria-label={label}
+      inputMode="decimal"
+      placeholder="h:mm"
+      title="Time as h:mm, e.g. 1:45"
+      pattern="\d+(:[0-5]\d|\.\d+)?|\.\d+"
+      required
+      value={text}
+      onChange={(event) => {
+        setText(event.target.value);
+        const parsed = parseHours(event.target.value);
+        if (parsed !== null) onChange(parsed);
+      }}
+      onBlur={() => {
+        const parsed = parseHours(text);
+        if (parsed !== null) setText(formatHours(parsed));
+      }}
+      className="h-10 rounded-lg border border-slate-200 px-2 text-sm invalid:border-rose-300 invalid:text-rose-600"
+    />
   );
 }
 

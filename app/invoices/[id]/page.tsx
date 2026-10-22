@@ -7,6 +7,7 @@ import { CrmShell } from "../../../components/crm-shell";
 import { SafeLink as Link } from "../../../components/safe-link";
 import { api } from "../../../lib/api";
 import { FinanceSettings, Invoice, formatDate } from "../../../lib/crm";
+import { lineQuantity, normalizeInvoiceLine, pricingTypeOf } from "../../../lib/invoice-lines";
 
 const money = (value: number, currency: string) => new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(value || 0);
 
@@ -27,6 +28,7 @@ export default function InvoiceDetailPage() {
   });
   const invoice = query.data;
   const settings = settingsQuery.data?.settings;
+  const hasTime = invoice?.lineItems.some((item) => pricingTypeOf(item) === "time") ?? false;
   const printInvoice = (number: string) => {
     const previous = document.title;
     document.title = `Invoice-${number}`;
@@ -173,24 +175,30 @@ export default function InvoiceDetailPage() {
               <thead className="bg-rose-950 text-xs uppercase tracking-wider text-white print:[-webkit-print-color-adjust:exact] print:[print-color-adjust:exact]">
                 <tr>
                   <th className="px-4 py-3 print:py-2">Description</th>
-                  <th className="px-4 py-3 text-right print:py-2">Quantity</th>
+                  <th className="px-4 py-3 text-right print:py-2">{hasTime ? "Qty / time" : "Quantity"}</th>
                   <th className="px-4 py-3 print:py-2">Unit</th>
                   <th className="px-4 py-3 text-right print:py-2">Rate</th>
                   <th className="px-4 py-3 text-right print:py-2">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {invoice.lineItems.map((item) => (
-                  <tr key={item._id || item.description} className="break-inside-avoid border-b border-slate-100 last:border-0">
-                    <td className="px-4 py-4 text-sm text-slate-700 print:py-2">{item.description}</td>
-                    <td className="px-4 py-4 text-right text-sm print:py-2">{item.quantity}</td>
-                    <td className="px-4 py-4 text-sm capitalize text-slate-500 print:py-2">{item.unit || "—"}</td>
-                    <td className="px-4 py-4 text-right text-sm print:py-2">{money(item.rate, invoice.currency)}</td>
-                    <td className="px-4 py-4 text-right text-sm font-semibold print:py-2">
-                      {money(item.amount ?? item.quantity * item.rate, invoice.currency)}
-                    </td>
-                  </tr>
-                ))}
+                {invoice.lineItems.map(normalizeInvoiceLine).map((item) => {
+                  const time = item.pricingType === "time";
+                  return (
+                    <tr key={item._id || item.description} className="break-inside-avoid border-b border-slate-100 last:border-0">
+                      <td className="px-4 py-4 text-sm text-slate-700 print:py-2">{item.description}</td>
+                      <td className="px-4 py-4 text-right text-sm tabular-nums print:py-2">{lineQuantity(item)}</td>
+                      <td className="px-4 py-4 text-sm capitalize text-slate-500 print:py-2">{time ? (item.unit === "day" ? "Days" : "Hours") : item.unit || "—"}</td>
+                      <td className="px-4 py-4 text-right text-sm print:py-2">
+                        {money(item.rate, invoice.currency)}
+                        {time && <span className="text-xs text-slate-500"> / {item.unit}</span>}
+                      </td>
+                      <td className="px-4 py-4 text-right text-sm font-semibold print:py-2">
+                        {money(item.amount ?? item.quantity * item.rate, invoice.currency)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -4,6 +4,7 @@ export type Contact = {
   email?: string;
   phone?: { generic?: string; mobile?: string; direct?: string; office?: string; home?: string };
   address?: { formatted?: string; houseName?: string; street?: string; postCode?: string; city?: string; county?: string };
+  hourlyRate?: HourlyRate | null;
   jobTitle?: string;
   company?: string | null | { _id: string; name?: { companyName?: string }; website?: string };
   contactType?: string;
@@ -28,11 +29,21 @@ export type Company = {
   website?: string;
   annualIncome?: number | null;
   staffNumber?: number | null;
+  address?: CompanyAddress[];
+  hourlyRate?: HourlyRate | null;
   archivedAt?: string | null;
   updatedAt: string;
   createdAt: string;
   contacts?: Contact[];
 };
+export type CompanyAddress = { _id?: string; type?: string; houseName?: string; street?: string; postCode?: string; city?: string; county?: string; country?: string };
+// A customer's default hourly rate; quotes and invoices use it when they are in the same currency.
+export type HourlyRate = { amount: number; currency: string };
+// Companies can hold several addresses; invoices use the billing one, else the first.
+export const billingAddress = (company?: Pick<Company, "address"> | null) =>
+  company?.address?.find((address) => address.type === "billing") || company?.address?.[0];
+export const addressLines = (address?: CompanyAddress) =>
+  address ? [address.houseName, address.street, address.city, address.county, address.postCode, address.country].filter(Boolean) as string[] : [];
 
 export type Interaction = {
   _id: string;
@@ -73,7 +84,7 @@ export const LEAD_STATUSES = [
   { value: "i rejected", label: "I Rejected" },
 ];
 
-export type InvoiceLine = { _id?: string; description: string; quantity: number; unit?: string; rate: number; amount?: number };
+export type InvoiceLine = { _id?: string; pricingType?: "fixed" | "time"; description: string; quantity: number; unit?: string; rate: number; amount?: number };
 export type Invoice = {
   _id: string; number: string; company?: Company | string; contact?: Contact | string;
   customerName: string; customerContact?: string; billingAddress?: string; project?: string; purchaseOrder?: string;
